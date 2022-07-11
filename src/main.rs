@@ -2,12 +2,14 @@ use bevy::prelude::*;
 
 fn main() {
     App::new()
+        .insert_resource(ClearColor(Color::rgb(0.1, 0.1, 0.2)))
         .add_plugins(DefaultPlugins)
         .add_startup_system(setup)
         .add_system(animate)
         .add_system(linear_motion)
         .add_system(sprite_transform)
         .add_system(shoot_bullet)
+        .add_system(cleanup_bullets)
         .run();
 }
 
@@ -87,5 +89,28 @@ fn shoot_bullet(
             tower.0 += SHOOT_INTERVAL;
         }
         tower.0 -= delta;
+    }
+}
+
+fn cleanup_bullets(
+    mut commands: Commands,
+    windows: Res<Windows>,
+    query: Query<(Entity, &Position, &Bullet)>,
+) {
+    let window = if let Some(window) = windows.iter().next() {
+        window
+    } else {
+        return;
+    };
+    let (width, height) = (window.width(), window.height());
+    for (entity, position, _) in query.iter() {
+        if position.0.x < -width / 2.
+            || width / 2. < position.0.x
+            || position.0.y < -height / 2.
+            || height / 2. < position.0.y
+        {
+            commands.entity(entity).despawn();
+            println!("Despawned {entity:?}");
+        }
     }
 }
