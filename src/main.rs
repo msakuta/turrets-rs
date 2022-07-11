@@ -6,7 +6,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_startup_system(setup)
         .add_system(spawn_enemies)
-        .add_system(animate)
+        .add_system(tower_find_target)
         .add_system(linear_motion)
         .add_system(sprite_transform)
         .add_system(shoot_bullet)
@@ -29,6 +29,12 @@ struct Velocity(Vec2);
 struct Tower(f32);
 
 #[derive(Component)]
+struct BulletShooter(bool);
+
+#[derive(Component)]
+struct Target(Option<Entity>);
+
+#[derive(Component)]
 struct Bullet;
 
 #[derive(Component)]
@@ -45,13 +51,57 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
             })
             .insert(Position(Vec2::new(i as f32 * 100.0 - 100., 0.0)))
             .insert(Rotation(i as f64 * std::f64::consts::PI / 3.))
-            .insert(Tower(rand::random()));
+            .insert(Tower(rand::random()))
+            .insert(BulletShooter(false))
+            .insert(Target(None));
     }
 }
 
-fn animate(time: Res<Time>, mut query: Query<(&mut Rotation, &Tower)>) {
-    for (mut rotation, _) in query.iter_mut() {
-        rotation.0 += time.delta_seconds_f64();
+fn tower_find_target(
+    mut commands: Commands,
+    time: Res<Time>,
+    mut query: Query<(&mut Rotation, &Position, &mut BulletShooter, &mut Target), With<Tower>>,
+    enemy_query: Query<(Entity, &Position), With<Enemy>>,
+) {
+    for (mut rotation, position, mut bullet_shooter, mut target) in query.iter_mut() {
+        let new_target = enemy_query
+            .iter()
+            .fold(None, |acc, (enemy_entity, enemy_position)| {
+                let this_dist = enemy_position.0.distance(position.0);
+                if let Some((prev_dist, _, _)) = acc {
+                    if this_dist < prev_dist {
+                        Some((this_dist, enemy_entity, enemy_position))
+                    } else {
+                        acc
+                    }
+                } else {
+                    Some((this_dist, enemy_entity, enemy_position))
+                }
+            });
+
+        use std::f64::consts::PI;
+        const TWOPI: f64 = PI * 2.;
+        const ANGLE_SPEED: f64 = PI / 50.;
+
+        if let Some((_, new_target, enemy_position)) = new_target {
+            target.0 = Some(new_target);
+
+            let delta = enemy_position.0 - position.0;
+            let target_angle = delta.y.atan2(delta.x) as f64;
+            let delta_angle = target_angle - rotation.0;
+            let wrap_angle =
+                ((delta_angle + PI) - ((delta_angle + PI) / TWOPI).floor() * TWOPI) - PI;
+            bullet_shooter.0 = if wrap_angle.abs() < ANGLE_SPEED {
+                rotation.0 = target_angle;
+                true
+            } else if wrap_angle < 0. {
+                rotation.0 = (rotation.0 - ANGLE_SPEED) % TWOPI;
+                wrap_angle.abs() < PI / 4.
+            } else {
+                rotation.0 = (rotation.0 + ANGLE_SPEED) % TWOPI;
+                wrap_angle.abs() < PI / 4.
+            };
+        }
     }
 }
 
@@ -115,16 +165,19 @@ fn sprite_transform(mut query: Query<(&Position, Option<&Rotation>, &mut Transfo
 }
 
 const SHOOT_INTERVAL: f32 = 1.;
-const BULLET_SPEED: f32 = 300.;
+const BULLET_SPEED: f32 = 500.;
 
 fn shoot_bullet(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     time: Res<Time>,
-    mut query: Query<(&Position, &Rotation, &mut Tower)>,
+    mut query: Query<(&Position, &Rotation, &BulletShooter, &mut Tower)>,
 ) {
     let delta = time.delta_seconds();
-    for (position, rotation, mut tower) in query.iter_mut() {
+    for (position, rotation, bullet_shooter, mut tower) in query.iter_mut() {
+        if !bullet_shooter.0 {
+            continue;
+        }
         if tower.0 < delta {
             commands
                 .spawn_bundle(SpriteBundle {
