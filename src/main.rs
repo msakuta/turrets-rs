@@ -5,11 +5,13 @@ fn main() {
         .insert_resource(ClearColor(Color::rgb(0.1, 0.1, 0.2)))
         .add_plugins(DefaultPlugins)
         .add_startup_system(setup)
+        .add_system(spawn_enemies)
         .add_system(animate)
         .add_system(linear_motion)
         .add_system(sprite_transform)
         .add_system(shoot_bullet)
-        .add_system(cleanup_bullets)
+        .add_system(cleanup::<Bullet>)
+        .add_system(cleanup::<Enemy>)
         .run();
 }
 
@@ -27,6 +29,9 @@ struct Tower(f32);
 
 #[derive(Component)]
 struct Bullet;
+
+#[derive(Component)]
+struct Enemy;
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
@@ -49,17 +54,62 @@ fn animate(time: Res<Time>, mut query: Query<(&mut Rotation, &Tower)>) {
     }
 }
 
+fn spawn_enemies(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    windows: Res<Windows>,
+    time: Res<Time>,
+) {
+    if time.delta_seconds() < rand::random() {
+        return;
+    }
+
+    let window = if let Some(window) = windows.iter().next() {
+        window
+    } else {
+        return;
+    };
+    let (width, height) = (window.width(), window.height());
+
+    let down = rand::random::<bool>();
+
+    commands
+        .spawn_bundle(SpriteBundle {
+            texture: asset_server.load("enemy.png"),
+            ..default()
+        })
+        .insert(Position(Vec2::new(
+            rand::random(),
+            if down {
+                -height / 2. + 10.
+            } else {
+                height / 2. - 10.
+            },
+        )))
+        .insert(Velocity(
+            BULLET_SPEED
+                * Vec2::new(
+                    rand::random::<f32>() - 0.5,
+                    rand::random::<f32>() * (if down { 1. } else { -1. }),
+                ),
+        ))
+        .insert(Enemy);
+}
+
 fn linear_motion(time: Res<Time>, mut query: Query<(&mut Position, &Velocity)>) {
     for (mut position, velocity) in query.iter_mut() {
         position.0 += velocity.0 * time.delta_seconds();
     }
 }
 
-fn sprite_transform(mut query: Query<(&Position, &Rotation, &mut Transform)>) {
+fn sprite_transform(mut query: Query<(&Position, Option<&Rotation>, &mut Transform)>) {
     for (position, rotation, mut transform) in query.iter_mut() {
-        *transform = Transform::from_xyz(position.0.x, position.0.y, 0.)
-            .with_rotation(Quat::from_rotation_z(rotation.0 as f32))
-            .with_scale(Vec3::new(3., 3., 3.));
+        let mut trans = Transform::from_xyz(position.0.x, position.0.y, 0.);
+        if let Some(rotation) = rotation {
+            trans = trans.with_rotation(Quat::from_rotation_z(rotation.0 as f32));
+        }
+        trans = trans.with_scale(Vec3::new(3., 3., 3.));
+        *transform = trans;
     }
 }
 
@@ -92,10 +142,10 @@ fn shoot_bullet(
     }
 }
 
-fn cleanup_bullets(
+fn cleanup<T: Component>(
     mut commands: Commands,
     windows: Res<Windows>,
-    query: Query<(Entity, &Position, &Bullet)>,
+    query: Query<(Entity, &Position, &T)>,
 ) {
     let window = if let Some(window) = windows.iter().next() {
         window
@@ -110,7 +160,7 @@ fn cleanup_bullets(
             || height / 2. < position.0.y
         {
             commands.entity(entity).despawn();
-            println!("Despawned {entity:?}");
+            println!("Despawned {entity:?} ({})", std::any::type_name::<T>());
         }
     }
 }
