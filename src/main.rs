@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, sprite::collide_aabb::collide};
 
 fn main() {
     App::new()
@@ -10,6 +10,7 @@ fn main() {
         .add_system(linear_motion)
         .add_system(sprite_transform)
         .add_system(shoot_bullet)
+        .add_system(bullet_check)
         .add_system(cleanup::<Bullet>)
         .add_system(cleanup::<Enemy>)
         .run();
@@ -139,6 +140,31 @@ fn shoot_bullet(
             tower.0 += SHOOT_INTERVAL;
         }
         tower.0 -= delta;
+    }
+}
+
+const ENEMY_SIZE: f32 = 20.;
+const BULLET_SIZE: f32 = 20.;
+
+fn bullet_check(
+    mut commands: Commands,
+    enemy_query: Query<(Entity, &Transform), With<Enemy>>,
+    bullet_query: Query<(Entity, &Transform), With<Bullet>>,
+) {
+    for (bullet_entity, bullet_transform) in bullet_query.iter() {
+        for (enemy_entity, enemy_transform) in enemy_query.iter() {
+            let collision = collide(
+                bullet_transform.translation,
+                Vec2::new(BULLET_SIZE, BULLET_SIZE),
+                enemy_transform.translation,
+                Vec2::new(ENEMY_SIZE, ENEMY_SIZE),
+            );
+
+            if collision.is_some() {
+                commands.entity(bullet_entity).despawn();
+                commands.entity(enemy_entity).despawn();
+            }
+        }
     }
 }
 
