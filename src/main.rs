@@ -28,10 +28,10 @@ struct Rotation(f64);
 struct Velocity(Vec2);
 
 #[derive(Component)]
-struct Tower(f32);
+struct Tower;
 
 #[derive(Component)]
-struct BulletShooter(bool);
+struct BulletShooter(bool, f32);
 
 #[derive(Component)]
 struct Shotgun;
@@ -40,7 +40,10 @@ struct Shotgun;
 struct Target(Option<Entity>);
 
 #[derive(Component)]
-struct Bullet;
+struct Bullet(bool);
+
+#[derive(Component)]
+struct BulletFilter(bool);
 
 #[derive(Component, Deref, DerefMut)]
 struct Health(f32);
@@ -129,9 +132,11 @@ fn setup(
             })
             .insert(Position(Vec2::new(i as f32 * 100.0 - 100., 0.0)))
             .insert(Rotation(i as f64 * std::f64::consts::PI / 3.))
-            .insert(Tower(rand::random()))
-            .insert(BulletShooter(false))
-            .insert(Target(None));
+            .insert(Tower)
+            .insert(Health(100.))
+            .insert(BulletShooter(false, rand::random::<f32>() * SHOOT_INTERVAL))
+            .insert(Target(None))
+            .insert(BulletFilter(false));
     }
 
     commands
@@ -141,10 +146,15 @@ fn setup(
         })
         .insert(Position(Vec2::new(0.0, -100.0)))
         .insert(Rotation(0.))
-        .insert(Tower(rand::random()))
-        .insert(BulletShooter(false))
+        .insert(Tower)
+        .insert(Health(200.))
+        .insert(BulletShooter(
+            false,
+            rand::random::<f32>() * SHOTGUN_SHOOT_INTERVAL,
+        ))
         .insert(Shotgun)
-        .insert(Target(None));
+        .insert(Target(None))
+        .insert(BulletFilter(false));
 }
 
 fn tower_find_target(
@@ -235,7 +245,9 @@ fn spawn_enemies(
                 ),
         ))
         .insert(Enemy)
-        .insert(Health(3.));
+        .insert(Health(3.))
+        .insert(BulletShooter(true, SHOOT_INTERVAL))
+        .insert(BulletFilter(true));
 }
 
 fn linear_motion(time: Res<Time>, mut query: Query<(&mut Position, &Velocity)>) {
@@ -265,18 +277,17 @@ fn shoot_bullet(
     time: Res<Time>,
     mut query: Query<(
         &Position,
-        &Rotation,
-        &BulletShooter,
-        &mut Tower,
+        Option<&Rotation>,
+        &mut BulletShooter,
         Option<&Shotgun>,
     )>,
 ) {
     let delta = time.delta_seconds();
-    for (position, rotation, bullet_shooter, mut tower, shotgun) in query.iter_mut() {
+    for (position, rotation, mut bullet_shooter, shotgun) in query.iter_mut() {
         if !bullet_shooter.0 {
             continue;
         }
-        if tower.0 < delta {
+        if bullet_shooter.1 < delta {
             let mut shoot = |file, angle: f64| {
                 commands
                     .spawn_bundle(SpriteBundle {
@@ -288,23 +299,31 @@ fn shoot_bullet(
                     .insert(Velocity(
                         BULLET_SPEED * Vec2::new(angle.cos() as f32, angle.sin() as f32),
                     ))
-                    .insert(Bullet);
+                    .insert(Bullet(rotation.is_some()));
             };
 
-            if shotgun.is_some() {
-                for i in -3..=3 {
-                    shoot(
-                        "shotgun-bullet.png",
-                        rotation.0 + i as f64 * std::f64::consts::PI / 20.,
-                    );
+            if let Some(rotation) = rotation {
+                if shotgun.is_some() {
+                    for i in -3..=3 {
+                        shoot(
+                            "shotgun-bullet.png",
+                            rotation.0 + i as f64 * std::f64::consts::PI / 20.,
+                        );
+                    }
+                    bullet_shooter.1 += SHOTGUN_SHOOT_INTERVAL;
+                } else {
+                    shoot("bullet.png", rotation.0);
+                    bullet_shooter.1 += SHOOT_INTERVAL;
                 }
-                tower.0 += SHOTGUN_SHOOT_INTERVAL;
             } else {
-                shoot("bullet.png", rotation.0);
-                tower.0 += SHOOT_INTERVAL;
+                shoot(
+                    "enemy-bullet.png",
+                    rand::random::<f64>() * std::f64::consts::PI * 2.,
+                );
+                bullet_shooter.1 += SHOOT_INTERVAL * rand::random::<f32>();
             }
         }
-        tower.0 -= delta;
+        bullet_shooter.1 -= delta;
     }
 }
 
@@ -313,45 +332,69 @@ const BULLET_SIZE: f32 = 20.;
 
 fn bullet_collision(
     mut commands: Commands,
-    mut enemy_query: Query<(Entity, &Transform, &mut Health), With<Enemy>>,
-    bullet_query: Query<(Entity, &Transform), With<Bullet>>,
+    mut enemy_query: Query<(Entity, &Transform, &mut Health, &BulletFilter)>,
+    bullet_query: Query<(Entity, &Transform, &Bullet)>,
     textures: Res<Textures>,
     mut scoreboard: ResMut<Scoreboard>,
 ) {
-    for (bullet_entity, bullet_transform) in bullet_query.iter() {
-        for (enemy_entity, enemy_transform, mut health) in enemy_query.iter_mut() {
-            let collision = collide(
-                bullet_transform.translation,
-                Vec2::new(BULLET_SIZE, BULLET_SIZE),
-                enemy_transform.translation,
-                Vec2::new(ENEMY_SIZE, ENEMY_SIZE),
-            );
-
-            if collision.is_some() {
-                commands.entity(bullet_entity).despawn();
-                if **health < 1. {
-                    commands.entity(enemy_entity).despawn();
-                    commands
-                        .spawn_bundle(SpriteSheetBundle {
-                            texture_atlas: textures.large_explosion.clone(),
-                            transform: bullet_transform.clone().with_scale(Vec3::splat(4.0)),
-                            ..default()
-                        })
-                        .insert(Explosion(Timer::from_seconds(0.15, true)));
-                    scoreboard.score += 10.;
-                } else {
-                    **health -= 1.;
-                }
-
-                commands
-                    .spawn_bundle(SpriteSheetBundle {
-                        texture_atlas: textures.small_explosion.clone(),
-                        transform: bullet_transform.clone().with_scale(Vec3::splat(3.0)),
-                        ..default()
-                    })
-                    .insert(Explosion(Timer::from_seconds(0.06, true)));
+    for (bullet_entity, bullet_transform, bullet) in bullet_query.iter() {
+        for (entity, transform, mut health, bullet_filter) in enemy_query.iter_mut() {
+            if bullet.0 == bullet_filter.0 {
+                entity_collision(
+                    &mut commands,
+                    bullet_entity,
+                    bullet_transform,
+                    entity,
+                    transform,
+                    health,
+                    &textures,
+                    &mut scoreboard,
+                );
             }
         }
+    }
+}
+
+fn entity_collision(
+    commands: &mut Commands,
+    bullet_entity: Entity,
+    bullet_transform: &Transform,
+    entity: Entity,
+    transform: &Transform,
+    mut health: Mut<Health>,
+    textures: &Res<Textures>,
+    scoreboard: &mut ResMut<Scoreboard>,
+) {
+    let collision = collide(
+        bullet_transform.translation,
+        Vec2::new(BULLET_SIZE, BULLET_SIZE),
+        transform.translation,
+        Vec2::new(ENEMY_SIZE, ENEMY_SIZE),
+    );
+
+    if collision.is_some() {
+        commands.entity(bullet_entity).despawn();
+        if **health < 1. {
+            commands.entity(entity).despawn();
+            commands
+                .spawn_bundle(SpriteSheetBundle {
+                    texture_atlas: textures.large_explosion.clone(),
+                    transform: bullet_transform.clone().with_scale(Vec3::splat(4.0)),
+                    ..default()
+                })
+                .insert(Explosion(Timer::from_seconds(0.15, true)));
+            scoreboard.score += 10.;
+        } else {
+            **health -= 1.;
+        }
+
+        commands
+            .spawn_bundle(SpriteSheetBundle {
+                texture_atlas: textures.small_explosion.clone(),
+                transform: bullet_transform.clone().with_scale(Vec3::splat(3.0)),
+                ..default()
+            })
+            .insert(Explosion(Timer::from_seconds(0.06, true)));
     }
 }
 
