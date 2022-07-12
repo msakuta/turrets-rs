@@ -11,6 +11,7 @@ fn main() {
         .add_system(sprite_transform)
         .add_system(shoot_bullet)
         .add_system(bullet_collision)
+        .add_system(animate_sprite)
         .add_system(cleanup::<Bullet>)
         .add_system(cleanup::<Enemy>)
         .run();
@@ -40,7 +41,21 @@ struct Bullet;
 #[derive(Component)]
 struct Enemy;
 
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+#[derive(Component, Deref, DerefMut)]
+struct Explosion(Timer);
+
+#[derive(Component)]
+struct ExplosionSprite(Handle<TextureAtlas>);
+
+fn setup(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+) {
+    let texture_handle = asset_server.load("explode.png");
+    let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(16.0, 16.0), 8, 1);
+    let texture_atlas_handle = texture_atlases.add(texture_atlas);
+    commands.insert_resource(ExplosionSprite(texture_atlas_handle));
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
     for i in 0..3 {
@@ -166,7 +181,7 @@ fn sprite_transform(mut query: Query<(&Position, Option<&Rotation>, &mut Transfo
     }
 }
 
-const SHOOT_INTERVAL: f32 = 1.;
+const SHOOT_INTERVAL: f32 = 0.5;
 const BULLET_SPEED: f32 = 500.;
 
 fn shoot_bullet(
@@ -205,6 +220,7 @@ fn bullet_collision(
     mut commands: Commands,
     enemy_query: Query<(Entity, &Transform), With<Enemy>>,
     bullet_query: Query<(Entity, &Transform), With<Bullet>>,
+    explosion_sprite: Res<ExplosionSprite>,
 ) {
     for (bullet_entity, bullet_transform) in bullet_query.iter() {
         for (enemy_entity, enemy_transform) in enemy_query.iter() {
@@ -218,6 +234,38 @@ fn bullet_collision(
             if collision.is_some() {
                 commands.entity(bullet_entity).despawn();
                 commands.entity(enemy_entity).despawn();
+
+                commands
+                    .spawn_bundle(SpriteSheetBundle {
+                        texture_atlas: explosion_sprite.0.clone(),
+                        transform: bullet_transform.clone().with_scale(Vec3::splat(3.0)),
+                        ..default()
+                    })
+                    .insert(Explosion(Timer::from_seconds(0.06, true)));
+            }
+        }
+    }
+}
+
+fn animate_sprite(
+    mut commands: Commands,
+    time: Res<Time>,
+    texture_atlases: Res<Assets<TextureAtlas>>,
+    mut query: Query<(
+        Entity,
+        &mut Explosion,
+        &mut TextureAtlasSprite,
+        &Handle<TextureAtlas>,
+    )>,
+) {
+    for (entity, mut timer, mut sprite, texture_atlas_handle) in query.iter_mut() {
+        timer.tick(time.delta());
+        if timer.just_finished() {
+            let texture_atlas = texture_atlases.get(texture_atlas_handle).unwrap();
+            if sprite.index + 1 == texture_atlas.textures.len() {
+                commands.entity(entity).despawn();
+            } else {
+                sprite.index = (sprite.index + 1) % texture_atlas.textures.len();
             }
         }
     }
