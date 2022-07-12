@@ -35,16 +35,12 @@ Generate bundling code
 
 Browse [index.html](index.html).
 Your browser will probably refuse to load Wasm binary served from local file system.
-In that case, use
+In that case, 
 
-    npx serve
-
-if you are a Node.js user, or
-
-    python -m http.server
-
-if your are a Python user, or use [Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer) if you are a VSCode user, or
-use whatever your favourite web server application that can host from your
+* use `npx serve` if you are a Node.js user, or
+* `python -m http.server` if your are a Python user, or
+* use [Live Server](https://marketplace.visualstudio.com/items?itemName=ritwickdey.LiveServer) if you are a VSCode user, or
+* use whatever your favourite web server application that can host from your
 local filesystem.
 
 
