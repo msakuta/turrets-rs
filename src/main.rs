@@ -10,7 +10,7 @@ fn main() {
         .add_system(linear_motion)
         .add_system(sprite_transform)
         .add_system(shoot_bullet)
-        .add_system(bullet_check)
+        .add_system(bullet_collision)
         .add_system(cleanup::<Bullet>)
         .add_system(cleanup::<Enemy>)
         .run();
@@ -101,6 +101,8 @@ fn tower_find_target(
                 rotation.0 = (rotation.0 + ANGLE_SPEED) % TWOPI;
                 wrap_angle.abs() < PI / 4.
             };
+        } else {
+            bullet_shooter.0 = false;
         }
     }
 }
@@ -199,7 +201,7 @@ fn shoot_bullet(
 const ENEMY_SIZE: f32 = 20.;
 const BULLET_SIZE: f32 = 20.;
 
-fn bullet_check(
+fn bullet_collision(
     mut commands: Commands,
     enemy_query: Query<(Entity, &Transform), With<Enemy>>,
     bullet_query: Query<(Entity, &Transform), With<Bullet>>,
