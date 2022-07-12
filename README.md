@@ -2,6 +2,9 @@
 
 This is a port (or rather recreation) of [turrets](https://github.com/msakuta/turrets) game
 that I made in JavaScript 8 years ago.
+
+Try it now on your browser! https://msakuta.github.io/turrets-rs/
+
 Many things have changed since then. JavaScript became more sophisticated and heavy.
 And I feel limited in maintaining JavaScript project as it scales.
 
