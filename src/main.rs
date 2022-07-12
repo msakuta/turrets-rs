@@ -255,13 +255,21 @@ fn linear_motion(time: Res<Time>, mut query: Query<(&mut Position, &Velocity)>) 
 
 fn sprite_transform(mut query: Query<(&Position, Option<&Rotation>, &mut Transform)>) {
     for (position, rotation, mut transform) in query.iter_mut() {
-        let mut trans = Transform::from_xyz(position.0.x, position.0.y, 0.);
-        if let Some(rotation) = rotation {
-            trans = trans.with_rotation(Quat::from_rotation_z(rotation.0 as f32));
-        }
-        trans = trans.with_scale(Vec3::new(3., 3., 3.));
-        *transform = trans;
+        sprite_transform_single(position, rotation, transform.as_mut());
     }
+}
+
+fn sprite_transform_single(
+    position: &Position,
+    rotation: Option<&Rotation>,
+    transform: &mut Transform,
+) {
+    let mut trans = Transform::from_xyz(position.0.x, position.0.y, 0.);
+    if let Some(rotation) = rotation {
+        trans = trans.with_rotation(Quat::from_rotation_z(rotation.0 as f32));
+    }
+    trans = trans.with_scale(Vec3::new(3., 3., 3.));
+    *transform = trans;
 }
 
 const SHOOT_INTERVAL: f32 = 0.5;
@@ -286,13 +294,17 @@ fn shoot_bullet(
         }
         if bullet_shooter.1 < delta {
             let mut shoot = |file, angle: f64| {
+                let bullet_rotation = Rotation(angle);
+                let mut transform = default();
+                sprite_transform_single(position, Some(&bullet_rotation), &mut transform);
                 commands
                     .spawn_bundle(SpriteBundle {
                         texture: asset_server.load(file),
+                        transform,
                         ..default()
                     })
                     .insert(*position)
-                    .insert(Rotation(angle))
+                    .insert(bullet_rotation)
                     .insert(Velocity(
                         BULLET_SPEED * Vec2::new(angle.cos() as f32, angle.sin() as f32),
                     ))
