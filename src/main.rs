@@ -12,6 +12,7 @@ fn main() {
         .add_system(shoot_bullet)
         .add_system(bullet_collision)
         .add_system(animate_sprite)
+        .add_system(update_scoreboard)
         .add_system(cleanup::<Bullet>)
         .add_system(cleanup::<Enemy>)
         .run();
@@ -53,6 +54,15 @@ struct Textures {
     large_explosion: Handle<TextureAtlas>,
 }
 
+struct Scoreboard {
+    score: f64,
+}
+
+const SCOREBOARD_FONT_SIZE: f32 = 40.0;
+const SCOREBOARD_TEXT_PADDING: Val = Val::Px(5.0);
+const TEXT_COLOR: Color = Color::rgb(0.7, 0.7, 0.7);
+const SCORE_COLOR: Color = Color::rgb(1.0, 0.5, 0.5);
+
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -68,7 +78,45 @@ fn setup(
         small_explosion: gen_texture_handle("explode.png", 16., 8),
         large_explosion: gen_texture_handle("explode2.png", 32., 6),
     });
+    commands.insert_resource(Scoreboard { score: 0. });
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+
+    commands.spawn_bundle(UiCameraBundle::default());
+
+    // Scoreboard
+    commands.spawn_bundle(TextBundle {
+        text: Text {
+            sections: vec![
+                TextSection {
+                    value: "Score: ".to_string(),
+                    style: TextStyle {
+                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                        font_size: SCOREBOARD_FONT_SIZE,
+                        color: TEXT_COLOR,
+                    },
+                },
+                TextSection {
+                    value: "".to_string(),
+                    style: TextStyle {
+                        font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                        font_size: SCOREBOARD_FONT_SIZE,
+                        color: SCORE_COLOR,
+                    },
+                },
+            ],
+            ..default()
+        },
+        style: Style {
+            position_type: PositionType::Absolute,
+            position: Rect {
+                top: SCOREBOARD_TEXT_PADDING,
+                left: SCOREBOARD_TEXT_PADDING,
+                ..default()
+            },
+            ..default()
+        },
+        ..default()
+    });
 
     for i in 0..3 {
         commands
@@ -147,7 +195,7 @@ fn spawn_enemies(
     } else {
         return;
     };
-    let (width, height) = (window.width(), window.height());
+    let (_width, height) = (window.width(), window.height());
 
     let down = rand::random::<bool>();
 
@@ -232,6 +280,7 @@ fn bullet_collision(
     mut enemy_query: Query<(Entity, &Transform, &mut Health), With<Enemy>>,
     bullet_query: Query<(Entity, &Transform), With<Bullet>>,
     textures: Res<Textures>,
+    mut scoreboard: ResMut<Scoreboard>,
 ) {
     for (bullet_entity, bullet_transform) in bullet_query.iter() {
         for (enemy_entity, enemy_transform, mut health) in enemy_query.iter_mut() {
@@ -253,6 +302,7 @@ fn bullet_collision(
                             ..default()
                         })
                         .insert(Explosion(Timer::from_seconds(0.15, true)));
+                    scoreboard.score += 10.;
                 } else {
                     **health -= 1.;
                 }
@@ -291,6 +341,11 @@ fn animate_sprite(
             }
         }
     }
+}
+
+fn update_scoreboard(scoreboard: Res<Scoreboard>, mut query: Query<&mut Text>) {
+    let mut text = query.single_mut();
+    text.sections[1].value = format!("{}", scoreboard.score);
 }
 
 fn cleanup<T: Component>(
