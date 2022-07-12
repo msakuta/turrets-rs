@@ -23,7 +23,7 @@ jobs:
     - name: Install Wasm target
       run: rustup target add wasm32-unknown-unknown
     - name: Build
-      run: cargo build --release --target wasm32-unknown-unknown && mkdir pkg && wasm-bindgen --out-name wasm_example --target web --out-dir pkg .\target\wasm32-unknown-unknown\release\turrets-rs.wasm
+      run: cargo build --release --target wasm32-unknown-unknown && mkdir pkg && wasm-bindgen --out-name wasm_example --target web --out-dir pkg ./target/wasm32-unknown-unknown/release/turrets-rs.wasm
     - name: Deploy
       uses: peaceiris/actions-gh-pages@v3
       with:
