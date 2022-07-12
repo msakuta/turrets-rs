@@ -1,6 +1,7 @@
 mod bullet;
+mod tower;
 
-use crate::bullet::bullet_collision;
+use crate::{bullet::bullet_collision, tower::TowerBundle};
 use bevy::prelude::*;
 
 fn main() {
@@ -133,13 +134,11 @@ fn setup(
                 texture: asset_server.load("turret.png"),
                 ..default()
             })
-            .insert(Position(Vec2::new(i as f32 * 100.0 - 100., 0.0)))
-            .insert(Rotation(i as f64 * std::f64::consts::PI / 3.))
-            .insert(Tower)
-            .insert(Health(100.))
-            .insert(BulletShooter(false, rand::random::<f32>() * SHOOT_INTERVAL))
-            .insert(Target(None))
-            .insert(BulletFilter(false));
+            .insert_bundle(TowerBundle::new(
+                Position(Vec2::new(i as f32 * 100.0 - 100., 0.0)),
+                Rotation(i as f64 * std::f64::consts::PI / 3.),
+                Health(100.),
+            ));
     }
 
     commands
@@ -147,17 +146,12 @@ fn setup(
             texture: asset_server.load("shotgun.png"),
             ..default()
         })
-        .insert(Position(Vec2::new(0.0, -100.0)))
-        .insert(Rotation(0.))
-        .insert(Tower)
-        .insert(Health(200.))
-        .insert(BulletShooter(
-            false,
-            rand::random::<f32>() * SHOTGUN_SHOOT_INTERVAL,
+        .insert_bundle(TowerBundle::new(
+            Position(Vec2::new(0.0, -100.0)),
+            Rotation(0.),
+            Health(200.),
         ))
-        .insert(Shotgun)
-        .insert(Target(None))
-        .insert(BulletFilter(false));
+        .insert(Shotgun);
 }
 
 fn tower_find_target(
