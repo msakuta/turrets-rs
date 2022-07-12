@@ -38,24 +38,36 @@ struct Target(Option<Entity>);
 #[derive(Component)]
 struct Bullet;
 
+#[derive(Component, Deref, DerefMut)]
+struct Health(f32);
+
 #[derive(Component)]
 struct Enemy;
 
 #[derive(Component, Deref, DerefMut)]
 struct Explosion(Timer);
 
-#[derive(Component)]
-struct ExplosionSprite(Handle<TextureAtlas>);
+// #[derive(Component)]
+struct Textures {
+    small_explosion: Handle<TextureAtlas>,
+    large_explosion: Handle<TextureAtlas>,
+}
 
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
-    let texture_handle = asset_server.load("explode.png");
-    let texture_atlas = TextureAtlas::from_grid(texture_handle, Vec2::new(16.0, 16.0), 8, 1);
-    let texture_atlas_handle = texture_atlases.add(texture_atlas);
-    commands.insert_resource(ExplosionSprite(texture_atlas_handle));
+    let mut gen_texture_handle = |file, size, columns| {
+        let texture_handle = asset_server.load(file);
+        let texture_atlas =
+            TextureAtlas::from_grid(texture_handle, Vec2::new(size, size), columns, 1);
+        texture_atlases.add(texture_atlas)
+    };
+    commands.insert_resource(Textures {
+        small_explosion: gen_texture_handle("explode.png", 16., 8),
+        large_explosion: gen_texture_handle("explode2.png", 32., 6),
+    });
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
     for i in 0..3 {
@@ -73,8 +85,6 @@ fn setup(
 }
 
 fn tower_find_target(
-    mut commands: Commands,
-    time: Res<Time>,
     mut query: Query<(&mut Rotation, &Position, &mut BulletShooter, &mut Target), With<Tower>>,
     enemy_query: Query<(Entity, &Position), With<Enemy>>,
 ) {
@@ -161,7 +171,8 @@ fn spawn_enemies(
                     rand::random::<f32>() * (if down { 1. } else { -1. }),
                 ),
         ))
-        .insert(Enemy);
+        .insert(Enemy)
+        .insert(Health(3.));
 }
 
 fn linear_motion(time: Res<Time>, mut query: Query<(&mut Position, &Velocity)>) {
@@ -218,12 +229,12 @@ const BULLET_SIZE: f32 = 20.;
 
 fn bullet_collision(
     mut commands: Commands,
-    enemy_query: Query<(Entity, &Transform), With<Enemy>>,
+    mut enemy_query: Query<(Entity, &Transform, &mut Health), With<Enemy>>,
     bullet_query: Query<(Entity, &Transform), With<Bullet>>,
-    explosion_sprite: Res<ExplosionSprite>,
+    textures: Res<Textures>,
 ) {
     for (bullet_entity, bullet_transform) in bullet_query.iter() {
-        for (enemy_entity, enemy_transform) in enemy_query.iter() {
+        for (enemy_entity, enemy_transform, mut health) in enemy_query.iter_mut() {
             let collision = collide(
                 bullet_transform.translation,
                 Vec2::new(BULLET_SIZE, BULLET_SIZE),
@@ -233,11 +244,22 @@ fn bullet_collision(
 
             if collision.is_some() {
                 commands.entity(bullet_entity).despawn();
-                commands.entity(enemy_entity).despawn();
+                if **health < 1. {
+                    commands.entity(enemy_entity).despawn();
+                    commands
+                        .spawn_bundle(SpriteSheetBundle {
+                            texture_atlas: textures.large_explosion.clone(),
+                            transform: bullet_transform.clone().with_scale(Vec3::splat(4.0)),
+                            ..default()
+                        })
+                        .insert(Explosion(Timer::from_seconds(0.15, true)));
+                } else {
+                    **health -= 1.;
+                }
 
                 commands
                     .spawn_bundle(SpriteSheetBundle {
-                        texture_atlas: explosion_sprite.0.clone(),
+                        texture_atlas: textures.small_explosion.clone(),
                         transform: bullet_transform.clone().with_scale(Vec3::splat(3.0)),
                         ..default()
                     })
