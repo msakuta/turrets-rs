@@ -34,6 +34,9 @@ struct Tower(f32);
 struct BulletShooter(bool);
 
 #[derive(Component)]
+struct Shotgun;
+
+#[derive(Component)]
 struct Target(Option<Entity>);
 
 #[derive(Component)]
@@ -130,6 +133,18 @@ fn setup(
             .insert(BulletShooter(false))
             .insert(Target(None));
     }
+
+    commands
+        .spawn_bundle(SpriteBundle {
+            texture: asset_server.load("shotgun.png"),
+            ..default()
+        })
+        .insert(Position(Vec2::new(0.0, -100.0)))
+        .insert(Rotation(0.))
+        .insert(Tower(rand::random()))
+        .insert(BulletShooter(false))
+        .insert(Shotgun)
+        .insert(Target(None));
 }
 
 fn tower_find_target(
@@ -241,32 +256,53 @@ fn sprite_transform(mut query: Query<(&Position, Option<&Rotation>, &mut Transfo
 }
 
 const SHOOT_INTERVAL: f32 = 0.5;
+const SHOTGUN_SHOOT_INTERVAL: f32 = 1.5;
 const BULLET_SPEED: f32 = 500.;
 
 fn shoot_bullet(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     time: Res<Time>,
-    mut query: Query<(&Position, &Rotation, &BulletShooter, &mut Tower)>,
+    mut query: Query<(
+        &Position,
+        &Rotation,
+        &BulletShooter,
+        &mut Tower,
+        Option<&Shotgun>,
+    )>,
 ) {
     let delta = time.delta_seconds();
-    for (position, rotation, bullet_shooter, mut tower) in query.iter_mut() {
+    for (position, rotation, bullet_shooter, mut tower, shotgun) in query.iter_mut() {
         if !bullet_shooter.0 {
             continue;
         }
         if tower.0 < delta {
-            commands
-                .spawn_bundle(SpriteBundle {
-                    texture: asset_server.load("bullet.png"),
-                    ..default()
-                })
-                .insert(*position)
-                .insert(*rotation)
-                .insert(Velocity(
-                    BULLET_SPEED * Vec2::new(rotation.0.cos() as f32, rotation.0.sin() as f32),
-                ))
-                .insert(Bullet);
-            tower.0 += SHOOT_INTERVAL;
+            let mut shoot = |file, angle: f64| {
+                commands
+                    .spawn_bundle(SpriteBundle {
+                        texture: asset_server.load(file),
+                        ..default()
+                    })
+                    .insert(*position)
+                    .insert(Rotation(angle))
+                    .insert(Velocity(
+                        BULLET_SPEED * Vec2::new(angle.cos() as f32, angle.sin() as f32),
+                    ))
+                    .insert(Bullet);
+            };
+
+            if shotgun.is_some() {
+                for i in -3..=3 {
+                    shoot(
+                        "shotgun-bullet.png",
+                        rotation.0 + i as f64 * std::f64::consts::PI / 20.,
+                    );
+                }
+                tower.0 += SHOTGUN_SHOOT_INTERVAL;
+            } else {
+                shoot("bullet.png", rotation.0);
+                tower.0 += SHOOT_INTERVAL;
+            }
         }
         tower.0 -= delta;
     }
