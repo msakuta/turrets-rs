@@ -34,7 +34,7 @@ Build Wasm binary
 Generate bundling code
 
     mkdir pkg
-    wasm-bindgen --out-name wasm_example --target web --out-dir pkg .\target\wasm32-unknown-unknown\release\turrets-rs.wasm
+    wasm-bindgen --out-name wasm_example --target web --out-dir pkg ./target/wasm32-unknown-unknown/release/turrets-rs.wasm
 
 Browse [index.html](index.html).
 Your browser will probably refuse to load Wasm binary served from local file system.
