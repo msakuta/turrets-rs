@@ -1,8 +1,10 @@
 mod bullet;
+mod enemy;
 mod tower;
 
 use crate::{
     bullet::bullet_collision,
+    enemy::{enemy_system, spawn_enemies, Enemy},
     tower::{update_health_bar, Tower, TowerBundle},
 };
 use bevy::prelude::*;
@@ -13,6 +15,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_startup_system(setup)
         .add_system(spawn_enemies)
+        .add_system(enemy_system)
         .add_system(tower_find_target)
         .add_system(linear_motion)
         .add_system(sprite_transform)
@@ -22,7 +25,6 @@ fn main() {
         .add_system(update_scoreboard)
         .add_system(update_health_bar)
         .add_system(cleanup::<Bullet>)
-        .add_system(cleanup::<Enemy>)
         .run();
 }
 
@@ -32,7 +34,7 @@ struct Position(Vec2);
 #[derive(Component, Clone, Copy, Debug)]
 struct Rotation(f64);
 
-#[derive(Component, Clone, Copy, Debug)]
+#[derive(Component, Clone, Copy, Debug, Deref, DerefMut)]
 struct Velocity(Vec2);
 
 #[derive(Component)]
@@ -61,9 +63,6 @@ impl Health {
         Self { val, max: val }
     }
 }
-
-#[derive(Component)]
-struct Enemy;
 
 #[derive(Component, Deref, DerefMut)]
 struct Explosion(Timer);
@@ -214,51 +213,6 @@ fn tower_find_target(
             bullet_shooter.0 = false;
         }
     }
-}
-
-fn spawn_enemies(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    windows: Res<Windows>,
-    time: Res<Time>,
-) {
-    if time.delta_seconds() < rand::random() {
-        return;
-    }
-
-    let window = if let Some(window) = windows.iter().next() {
-        window
-    } else {
-        return;
-    };
-    let (_width, height) = (window.width(), window.height());
-
-    let down = rand::random::<bool>();
-
-    commands
-        .spawn_bundle(SpriteBundle {
-            texture: asset_server.load("enemy.png"),
-            ..default()
-        })
-        .insert(Position(Vec2::new(
-            rand::random(),
-            if down {
-                -height / 2. + 10.
-            } else {
-                height / 2. - 10.
-            },
-        )))
-        .insert(Velocity(
-            BULLET_SPEED
-                * Vec2::new(
-                    rand::random::<f32>() - 0.5,
-                    rand::random::<f32>() * (if down { 1. } else { -1. }),
-                ),
-        ))
-        .insert(Enemy)
-        .insert(Health::new(3.))
-        .insert(BulletShooter(true, SHOOT_INTERVAL))
-        .insert(BulletFilter(true));
 }
 
 fn linear_motion(time: Res<Time>, mut query: Query<(&mut Position, &Velocity)>) {
