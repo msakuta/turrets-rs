@@ -1,4 +1,4 @@
-use crate::{Bullet, BulletFilter, Explosion, Health, Scoreboard, Textures};
+use crate::{tower::Tower, Bullet, BulletFilter, Explosion, Health, Scoreboard, Textures};
 use bevy::{prelude::*, sprite::collide_aabb::collide};
 
 const ENEMY_SIZE: f32 = 20.;
@@ -6,13 +6,19 @@ const BULLET_SIZE: f32 = 20.;
 
 pub(crate) fn bullet_collision(
     mut commands: Commands,
-    mut enemy_query: Query<(Entity, &Transform, &mut Health, &BulletFilter)>,
+    mut target_query: Query<(
+        Entity,
+        &Transform,
+        &mut Health,
+        &BulletFilter,
+        Option<&Tower>,
+    )>,
     bullet_query: Query<(Entity, &Transform, &Bullet)>,
     textures: Res<Textures>,
     mut scoreboard: ResMut<Scoreboard>,
 ) {
     for (bullet_entity, bullet_transform, bullet) in bullet_query.iter() {
-        for (entity, transform, health, bullet_filter) in enemy_query.iter_mut() {
+        for (entity, transform, health, bullet_filter, tower) in target_query.iter_mut() {
             if bullet.0 == bullet_filter.0 {
                 entity_collision(
                     &mut commands,
@@ -20,6 +26,7 @@ pub(crate) fn bullet_collision(
                     bullet_transform,
                     entity,
                     transform,
+                    tower,
                     health,
                     &textures,
                     &mut scoreboard,
@@ -35,6 +42,7 @@ fn entity_collision(
     bullet_transform: &Transform,
     entity: Entity,
     transform: &Transform,
+    tower: Option<&Tower>,
     mut health: Mut<Health>,
     textures: &Res<Textures>,
     scoreboard: &mut ResMut<Scoreboard>,
@@ -48,8 +56,12 @@ fn entity_collision(
 
     if collision.is_some() {
         commands.entity(bullet_entity).despawn();
-        if **health < 1. {
+        if health.val < 1. {
             commands.entity(entity).despawn();
+            if let Some(tower) = tower {
+                commands.entity(tower.health_bar.0).despawn();
+                commands.entity(tower.health_bar.1).despawn();
+            }
             commands
                 .spawn_bundle(SpriteSheetBundle {
                     texture_atlas: textures.large_explosion.clone(),
@@ -59,7 +71,7 @@ fn entity_collision(
                 .insert(Explosion(Timer::from_seconds(0.15, true)));
             scoreboard.score += 10.;
         } else {
-            **health -= 1.;
+            health.val -= 1.;
         }
 
         commands

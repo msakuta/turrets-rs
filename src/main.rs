@@ -1,7 +1,10 @@
 mod bullet;
 mod tower;
 
-use crate::{bullet::bullet_collision, tower::TowerBundle};
+use crate::{
+    bullet::bullet_collision,
+    tower::{update_health_bar, Tower, TowerBundle},
+};
 use bevy::prelude::*;
 
 fn main() {
@@ -17,6 +20,7 @@ fn main() {
         .add_system(bullet_collision)
         .add_system(animate_sprite)
         .add_system(update_scoreboard)
+        .add_system(update_health_bar)
         .add_system(cleanup::<Bullet>)
         .add_system(cleanup::<Enemy>)
         .run();
@@ -30,9 +34,6 @@ struct Rotation(f64);
 
 #[derive(Component, Clone, Copy, Debug)]
 struct Velocity(Vec2);
-
-#[derive(Component)]
-struct Tower;
 
 #[derive(Component)]
 struct BulletShooter(bool, f32);
@@ -49,8 +50,17 @@ struct Bullet(bool);
 #[derive(Component)]
 struct BulletFilter(bool);
 
-#[derive(Component, Deref, DerefMut)]
-struct Health(f32);
+#[derive(Component)]
+struct Health {
+    val: f32,
+    max: f32,
+}
+
+impl Health {
+    fn new(val: f32) -> Self {
+        Self { val, max: val }
+    }
+}
 
 #[derive(Component)]
 struct Enemy;
@@ -129,28 +139,32 @@ fn setup(
     });
 
     for i in 0..3 {
+        let tower = TowerBundle::new(
+            &mut commands,
+            Position(Vec2::new(i as f32 * 100.0 - 100., 0.0)),
+            Rotation(i as f64 * std::f64::consts::PI / 3.),
+            Health::new(100.),
+        );
         commands
             .spawn_bundle(SpriteBundle {
                 texture: asset_server.load("turret.png"),
                 ..default()
             })
-            .insert_bundle(TowerBundle::new(
-                Position(Vec2::new(i as f32 * 100.0 - 100., 0.0)),
-                Rotation(i as f64 * std::f64::consts::PI / 3.),
-                Health(100.),
-            ));
+            .insert_bundle(tower);
     }
 
+    let tower = TowerBundle::new(
+        &mut commands,
+        Position(Vec2::new(0.0, -100.0)),
+        Rotation(0.),
+        Health::new(200.),
+    );
     commands
         .spawn_bundle(SpriteBundle {
             texture: asset_server.load("shotgun.png"),
             ..default()
         })
-        .insert_bundle(TowerBundle::new(
-            Position(Vec2::new(0.0, -100.0)),
-            Rotation(0.),
-            Health(200.),
-        ))
+        .insert_bundle(tower)
         .insert(Shotgun);
 }
 
@@ -242,7 +256,7 @@ fn spawn_enemies(
                 ),
         ))
         .insert(Enemy)
-        .insert(Health(3.))
+        .insert(Health::new(3.))
         .insert(BulletShooter(true, SHOOT_INTERVAL))
         .insert(BulletFilter(true));
 }
