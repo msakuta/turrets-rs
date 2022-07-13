@@ -5,7 +5,7 @@ mod tower;
 use crate::{
     bullet::bullet_collision,
     enemy::{enemy_system, spawn_enemies, Enemy},
-    tower::{update_health_bar, Tower, TowerBundle},
+    tower::{update_health_bar, Healer, Shotgun, Timeout, TowerBundle, TowerPlugin},
 };
 use bevy::prelude::*;
 
@@ -13,10 +13,10 @@ fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.1, 0.1, 0.2)))
         .add_plugins(DefaultPlugins)
+        .add_plugin(TowerPlugin)
         .add_startup_system(setup)
         .add_system(spawn_enemies)
         .add_system(enemy_system)
-        .add_system(tower_find_target)
         .add_system(linear_motion)
         .add_system(sprite_transform)
         .add_system(shoot_bullet)
@@ -39,9 +39,6 @@ struct Velocity(Vec2);
 
 #[derive(Component)]
 struct BulletShooter(bool, f32);
-
-#[derive(Component)]
-struct Shotgun;
 
 #[derive(Component)]
 struct Target(Option<Entity>);
@@ -149,7 +146,8 @@ fn setup(
                 texture: asset_server.load("turret.png"),
                 ..default()
             })
-            .insert_bundle(tower);
+            .insert_bundle(tower)
+            .insert(BulletShooter::new());
     }
 
     let tower = TowerBundle::new(
@@ -164,55 +162,22 @@ fn setup(
             ..default()
         })
         .insert_bundle(tower)
+        .insert(BulletShooter::new())
         .insert(Shotgun);
-}
 
-fn tower_find_target(
-    mut query: Query<(&mut Rotation, &Position, &mut BulletShooter, &mut Target), With<Tower>>,
-    enemy_query: Query<(Entity, &Position), With<Enemy>>,
-) {
-    for (mut rotation, position, mut bullet_shooter, mut target) in query.iter_mut() {
-        let new_target = enemy_query
-            .iter()
-            .fold(None, |acc, (enemy_entity, enemy_position)| {
-                let this_dist = enemy_position.0.distance(position.0);
-                if let Some((prev_dist, _, _)) = acc {
-                    if this_dist < prev_dist {
-                        Some((this_dist, enemy_entity, enemy_position))
-                    } else {
-                        acc
-                    }
-                } else {
-                    Some((this_dist, enemy_entity, enemy_position))
-                }
-            });
-
-        use std::f64::consts::PI;
-        const TWOPI: f64 = PI * 2.;
-        const ANGLE_SPEED: f64 = PI / 50.;
-
-        if let Some((_, new_target, enemy_position)) = new_target {
-            target.0 = Some(new_target);
-
-            let delta = enemy_position.0 - position.0;
-            let target_angle = delta.y.atan2(delta.x) as f64;
-            let delta_angle = target_angle - rotation.0;
-            let wrap_angle =
-                ((delta_angle + PI) - ((delta_angle + PI) / TWOPI).floor() * TWOPI) - PI;
-            bullet_shooter.0 = if wrap_angle.abs() < ANGLE_SPEED {
-                rotation.0 = target_angle;
-                true
-            } else if wrap_angle < 0. {
-                rotation.0 = (rotation.0 - ANGLE_SPEED) % TWOPI;
-                wrap_angle.abs() < PI / 4.
-            } else {
-                rotation.0 = (rotation.0 + ANGLE_SPEED) % TWOPI;
-                wrap_angle.abs() < PI / 4.
-            };
-        } else {
-            bullet_shooter.0 = false;
-        }
-    }
+    let tower = TowerBundle::new(
+        &mut commands,
+        Position(Vec2::new(0.0, 100.0)),
+        Rotation(0.),
+        Health::new(200.),
+    );
+    commands
+        .spawn_bundle(SpriteBundle {
+            texture: asset_server.load("healer.png"),
+            ..default()
+        })
+        .insert_bundle(tower)
+        .insert(Healer::new());
 }
 
 fn linear_motion(time: Res<Time>, mut query: Query<(&mut Position, &Velocity)>) {
@@ -221,9 +186,21 @@ fn linear_motion(time: Res<Time>, mut query: Query<(&mut Position, &Velocity)>) 
     }
 }
 
-fn sprite_transform(mut query: Query<(&Position, Option<&Rotation>, &mut Transform)>) {
-    for (position, rotation, mut transform) in query.iter_mut() {
-        sprite_transform_single(position, rotation, transform.as_mut());
+fn sprite_transform(
+    mut query: Query<(
+        &Position,
+        Option<&Rotation>,
+        &mut Transform,
+        Option<&Timeout>,
+    )>,
+) {
+    for (position, rotation, mut transform, timeout) in query.iter_mut() {
+        sprite_transform_single(
+            position,
+            rotation,
+            transform.as_mut(),
+            if timeout.is_some() { 0.1 } else { 0. },
+        );
     }
 }
 
@@ -231,8 +208,9 @@ fn sprite_transform_single(
     position: &Position,
     rotation: Option<&Rotation>,
     transform: &mut Transform,
+    z: f32,
 ) {
-    let mut trans = Transform::from_xyz(position.0.x, position.0.y, 0.);
+    let mut trans = Transform::from_xyz(position.0.x, position.0.y, z);
     if let Some(rotation) = rotation {
         trans = trans.with_rotation(Quat::from_rotation_z(rotation.0 as f32));
     }
@@ -264,7 +242,7 @@ fn shoot_bullet(
             let mut shoot = |file, angle: f64| {
                 let bullet_rotation = Rotation(angle);
                 let mut transform = default();
-                sprite_transform_single(position, Some(&bullet_rotation), &mut transform);
+                sprite_transform_single(position, Some(&bullet_rotation), &mut transform, 0.);
                 commands
                     .spawn_bundle(SpriteBundle {
                         texture: asset_server.load(file),
@@ -351,7 +329,7 @@ fn cleanup<T: Component>(
             || height / 2. < position.0.y
         {
             commands.entity(entity).despawn();
-            println!("Despawned {entity:?} ({})", std::any::type_name::<T>());
+            // println!("Despawned {entity:?} ({})", std::any::type_name::<T>());
         }
     }
 }
