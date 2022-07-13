@@ -17,7 +17,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: wasm-pack-action
-      uses: jetli/wasm-pack-action@v0.3.0
+      uses: jetli/wasm-bindgen-action@v0.1.0
       #with:
         # Optional version of wasm-pack to install (eg. "v0.9.1", "latest")
         #version: # optional, default is latest
@@ -28,4 +28,4 @@ jobs:
     - name: Run Rust tests
       run: cargo test --verbose
     - name: Build
-      run: wasm-pack build --target web
+      run: cargo c --target wasm32-unknown-unknown
