@@ -27,5 +27,7 @@ jobs:
       run: cargo c
     - name: Run Rust tests
       run: cargo test --verbose
-    - name: Build
+    - name: Install Wasm target
+      run: rustup target add wasm32-unknown-unknown
+    - name: Build Wasm target
       run: cargo c --target wasm32-unknown-unknown
