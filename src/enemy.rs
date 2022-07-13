@@ -4,13 +4,20 @@ use bevy::prelude::*;
 #[derive(Component)]
 pub(crate) struct Enemy;
 
+const MAX_ENEMIES: usize = 100;
+
 pub(crate) fn spawn_enemies(
     mut commands: Commands,
+    query: Query<&Enemy>,
     asset_server: Res<AssetServer>,
     windows: Res<Windows>,
     time: Res<Time>,
 ) {
-    let num = poisson_random(time.delta_seconds() * 3.);
+    let enemy_count = query.iter().count();
+    if MAX_ENEMIES <= enemy_count {
+        return;
+    }
+    let num = poisson_random(time.delta_seconds() * 3.).min(MAX_ENEMIES - enemy_count);
     if num == 0 {
         return;
     }
