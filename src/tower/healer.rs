@@ -72,11 +72,11 @@ pub(crate) fn heal_target(
     mut commands: Commands,
     time: Res<Time>,
     asset_server: Res<AssetServer>,
-    mut query: Query<(&mut Healer, &Target)>,
+    mut query: Query<(&mut Healer, &Target, &Position)>,
     mut target_query: Query<(&Position, &mut Health)>,
 ) {
     let delta = time.delta_seconds();
-    for (mut healer, target) in query.iter_mut() {
+    for (mut healer, target, position) in query.iter_mut() {
         if !healer.0 {
             continue;
         }
@@ -86,7 +86,7 @@ pub(crate) fn heal_target(
         }
 
         if let Some(target) = target.0 {
-            if let Ok((position, mut target)) = target_query.get_mut(target) {
+            if let Ok((target_position, mut target)) = target_query.get_mut(target) {
                 if target.val < target.max {
                     target.val += HEALER_AMOUNT;
                     healer.1 += HEALER_INTERVAL;
@@ -99,9 +99,27 @@ pub(crate) fn heal_target(
                             },
                             ..default()
                         })
-                        .insert(Position(position.0))
+                        .insert(Position(target_position.0))
                         .insert(Velocity(Vec2::new(0., 5.)))
                         .insert(Timeout(HEALER_INTERVAL));
+
+                    let delta = position.0 - target_position.0;
+                    let centroid = (position.0 + target_position.0) / 2.;
+
+                    commands
+                        .spawn_bundle(SpriteBundle {
+                            sprite: Sprite {
+                                color: Color::rgb(0.25, 1., 0.25),
+                                custom_size: Some(Vec2::new(delta.length(), 2.0)),
+                                ..default()
+                            },
+                            transform: Transform::from_translation(Vec3::new(
+                                centroid.x, centroid.y, 0.1,
+                            ))
+                            .with_rotation(Quat::from_rotation_z(delta.y.atan2(delta.x))),
+                            ..default()
+                        })
+                        .insert(Timeout(HEALER_INTERVAL / 2.));
                     continue;
                 }
             }
