@@ -1,11 +1,13 @@
 mod bullet;
 mod enemy;
 mod tower;
+mod ui;
 
 use crate::{
     bullet::bullet_collision,
     enemy::{enemy_system, spawn_enemies, Enemy},
     tower::{update_health_bar, Healer, Shotgun, Timeout, TowerBundle, TowerPlugin},
+    ui::UIPlugin,
 };
 use bevy::prelude::*;
 
@@ -13,6 +15,7 @@ fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.1, 0.1, 0.2)))
         .add_plugins(DefaultPlugins)
+        .add_plugin(UIPlugin)
         .add_plugin(TowerPlugin)
         .add_startup_system(setup)
         .add_system(spawn_enemies)
@@ -74,11 +77,6 @@ struct Scoreboard {
     score: f64,
 }
 
-const SCOREBOARD_FONT_SIZE: f32 = 40.0;
-const SCOREBOARD_TEXT_PADDING: Val = Val::Px(5.0);
-const TEXT_COLOR: Color = Color::rgb(0.7, 0.7, 0.7);
-const SCORE_COLOR: Color = Color::rgb(1.0, 0.5, 0.5);
-
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -98,41 +96,6 @@ fn setup(
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
     commands.spawn_bundle(UiCameraBundle::default());
-
-    // Scoreboard
-    commands.spawn_bundle(TextBundle {
-        text: Text {
-            sections: vec![
-                TextSection {
-                    value: "Score: ".to_string(),
-                    style: TextStyle {
-                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                        font_size: SCOREBOARD_FONT_SIZE,
-                        color: TEXT_COLOR,
-                    },
-                },
-                TextSection {
-                    value: "".to_string(),
-                    style: TextStyle {
-                        font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                        font_size: SCOREBOARD_FONT_SIZE,
-                        color: SCORE_COLOR,
-                    },
-                },
-            ],
-            ..default()
-        },
-        style: Style {
-            position_type: PositionType::Absolute,
-            position: Rect {
-                top: SCOREBOARD_TEXT_PADDING,
-                left: SCOREBOARD_TEXT_PADDING,
-                ..default()
-            },
-            ..default()
-        },
-        ..default()
-    });
 
     for i in 0..3 {
         let tower = TowerBundle::new(
