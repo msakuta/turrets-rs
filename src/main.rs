@@ -6,7 +6,7 @@ mod ui;
 use crate::{
     bullet::bullet_collision,
     enemy::{enemy_system, spawn_enemies, Enemy},
-    tower::{update_health_bar, Healer, Shotgun, Timeout, TowerBundle, TowerPlugin},
+    tower::{spawn_towers, update_health_bar, Healer, Shotgun, Timeout, TowerBundle, TowerPlugin},
     ui::UIPlugin,
 };
 use bevy::prelude::*;
@@ -18,6 +18,9 @@ fn main() {
         .add_plugin(UIPlugin)
         .add_plugin(TowerPlugin)
         .add_startup_system(setup)
+        .add_system(time_level)
+        .add_system(erase_entities_new_game::<Enemy>)
+        .add_system(erase_entities_new_game::<Bullet>)
         .add_system(spawn_enemies)
         .add_system(enemy_system)
         .add_system(linear_motion)
@@ -59,7 +62,7 @@ struct Health {
 }
 
 impl Health {
-    fn new(val: f32) -> Self {
+    const fn new(val: f32) -> Self {
         Self { val, max: val }
     }
 }
@@ -75,6 +78,10 @@ struct Textures {
 
 struct Scoreboard {
     score: f64,
+}
+
+struct Level {
+    timer: Timer,
 }
 
 fn setup(
@@ -93,54 +100,31 @@ fn setup(
         large_explosion: gen_texture_handle("explode2.png", 32., 6),
     });
     commands.insert_resource(Scoreboard { score: 0. });
+    commands.insert_resource(Level {
+        timer: Timer::from_seconds(120., true),
+    });
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
     commands.spawn_bundle(UiCameraBundle::default());
 
-    for i in 0..3 {
-        let tower = TowerBundle::new(
-            &mut commands,
-            Position(Vec2::new(i as f32 * 100.0 - 100., 0.0)),
-            Rotation(i as f64 * std::f64::consts::PI / 3.),
-            Health::new(100.),
-        );
-        commands
-            .spawn_bundle(SpriteBundle {
-                texture: asset_server.load("turret.png"),
-                ..default()
-            })
-            .insert_bundle(tower)
-            .insert(BulletShooter::new());
+    spawn_towers(&mut commands, &asset_server);
+}
+
+fn time_level(mut level: ResMut<Level>, time: Res<Time>) {
+    level.timer.tick(time.delta());
+}
+
+fn erase_entities_new_game<T: Component>(
+    mut commands: Commands,
+    level: Res<Level>,
+    query: Query<Entity, With<T>>,
+) {
+    if level.timer.just_finished() {
+        println!("Round finished!");
+        for entity in query.iter() {
+            commands.entity(entity).despawn();
+        }
     }
-
-    let tower = TowerBundle::new(
-        &mut commands,
-        Position(Vec2::new(0.0, -100.0)),
-        Rotation(0.),
-        Health::new(200.),
-    );
-    commands
-        .spawn_bundle(SpriteBundle {
-            texture: asset_server.load("shotgun.png"),
-            ..default()
-        })
-        .insert_bundle(tower)
-        .insert(BulletShooter::new())
-        .insert(Shotgun);
-
-    let tower = TowerBundle::new(
-        &mut commands,
-        Position(Vec2::new(0.0, 100.0)),
-        Rotation(0.),
-        Health::new(200.),
-    );
-    commands
-        .spawn_bundle(SpriteBundle {
-            texture: asset_server.load("healer.png"),
-            ..default()
-        })
-        .insert_bundle(tower)
-        .insert(Healer::new());
 }
 
 fn linear_motion(time: Res<Time>, mut query: Query<(&mut Position, &Velocity)>) {

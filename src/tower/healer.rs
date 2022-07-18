@@ -12,7 +12,7 @@ impl Healer {
 }
 
 const HEALER_RANGE: f32 = 300.;
-const HEALER_AMOUNT: f32 = 3.;
+const HEALER_AMOUNT: f32 = 1.;
 const HEALER_INTERVAL: f32 = 2.;
 
 pub(crate) fn healer_find_target(

@@ -2,7 +2,8 @@ mod healer;
 
 use self::healer::{heal_target, healer_find_target};
 use crate::{
-    BulletFilter, BulletShooter, Enemy, Health, Position, Rotation, Target, SHOOT_INTERVAL,
+    BulletFilter, BulletShooter, Enemy, Health, Level, Position, Rotation, Scoreboard, Target,
+    SHOOT_INTERVAL,
 };
 use bevy::prelude::*;
 
@@ -63,8 +64,76 @@ impl Plugin for TowerPlugin {
             .add_system(tower_find_target)
             .add_system(healer_find_target)
             .add_system(heal_target)
-            .add_system(timeout);
+            .add_system(timeout)
+            .add_system(spawn_towers_new_game);
     }
+}
+
+fn spawn_towers_new_game(
+    mut commands: Commands,
+    level: Res<Level>,
+    query: Query<&Tower>,
+    mut scoreboard: ResMut<Scoreboard>,
+    asset_server: Res<AssetServer>,
+) {
+    if level.timer.just_finished() {
+        println!("Round finished!");
+        if query.iter().next().is_none() {
+            spawn_towers(&mut commands, &asset_server);
+            scoreboard.score = 0.;
+        }
+    }
+}
+
+const TOWER_HEALTH: Health = Health::new(10.);
+const SHOTGUN_HEALTH: Health = Health::new(20.);
+const HEALER_HEALTH: Health = Health::new(20.);
+
+pub(crate) fn spawn_towers(commands: &mut Commands, asset_server: &Res<AssetServer>) {
+    for i in 0..3 {
+        let tower = TowerBundle::new(
+            commands,
+            Position(Vec2::new(i as f32 * 100.0 - 100., 0.0)),
+            Rotation(i as f64 * std::f64::consts::PI / 3.),
+            TOWER_HEALTH,
+        );
+        commands
+            .spawn_bundle(SpriteBundle {
+                texture: asset_server.load("turret.png"),
+                ..default()
+            })
+            .insert_bundle(tower)
+            .insert(BulletShooter::new());
+    }
+
+    let tower = TowerBundle::new(
+        commands,
+        Position(Vec2::new(0.0, -100.0)),
+        Rotation(0.),
+        SHOTGUN_HEALTH,
+    );
+    commands
+        .spawn_bundle(SpriteBundle {
+            texture: asset_server.load("shotgun.png"),
+            ..default()
+        })
+        .insert_bundle(tower)
+        .insert(BulletShooter::new())
+        .insert(Shotgun);
+
+    let tower = TowerBundle::new(
+        commands,
+        Position(Vec2::new(0.0, 100.0)),
+        Rotation(0.),
+        HEALER_HEALTH,
+    );
+    commands
+        .spawn_bundle(SpriteBundle {
+            texture: asset_server.load("healer.png"),
+            ..default()
+        })
+        .insert_bundle(tower)
+        .insert(Healer::new());
 }
 
 const HEALTH_BAR_WIDTH: f32 = 80.;
