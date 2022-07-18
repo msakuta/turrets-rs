@@ -23,6 +23,9 @@ pub(crate) struct TowerScore {
 pub(crate) struct Shotgun;
 
 #[derive(Component)]
+pub(crate) struct MissileTower;
+
+#[derive(Component)]
 pub(crate) struct Timeout(f32);
 
 #[derive(Bundle)]
@@ -100,6 +103,7 @@ fn spawn_towers_new_game(
 const TOWER_HEALTH: Health = Health::new(10.);
 const SHOTGUN_HEALTH: Health = Health::new(20.);
 const HEALER_HEALTH: Health = Health::new(20.);
+const MISSILE_HEALTH: Health = Health::new(30.);
 
 pub(crate) fn spawn_towers(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     for i in 0..3 {
@@ -146,6 +150,21 @@ pub(crate) fn spawn_towers(commands: &mut Commands, asset_server: &Res<AssetServ
         })
         .insert_bundle(tower)
         .insert(Healer::new());
+
+    let tower = TowerBundle::new(
+        commands,
+        Position(Vec2::new(100.0, 100.0)),
+        Rotation(0.),
+        MISSILE_HEALTH,
+    );
+    commands
+        .spawn_bundle(SpriteBundle {
+            texture: asset_server.load("missile-tower.png"),
+            ..default()
+        })
+        .insert_bundle(tower)
+        .insert(BulletShooter::new())
+        .insert(MissileTower);
 }
 
 const HEALTH_BAR_WIDTH: f32 = 80.;

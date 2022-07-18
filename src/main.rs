@@ -5,7 +5,7 @@ mod tower;
 mod ui;
 
 use crate::{
-    bullet::{bullet_collision, shoot_bullet},
+    bullet::{Bullet, BulletPlugin},
     enemy::{enemy_system, spawn_enemies, Enemy},
     mouse::MousePlugin,
     tower::{update_health_bar, Timeout, TowerPlugin},
@@ -19,6 +19,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(UIPlugin)
         .add_plugin(TowerPlugin)
+        .add_plugin(BulletPlugin)
         .add_plugin(MousePlugin)
         .add_startup_system(setup)
         .add_system(time_level)
@@ -29,8 +30,6 @@ fn main() {
         .add_system(enemy_system)
         .add_system(linear_motion)
         .add_system(sprite_transform)
-        .add_system(shoot_bullet)
-        .add_system(bullet_collision)
         .add_system(animate_sprite)
         .add_system(update_health_bar)
         .add_system(cleanup::<Bullet>)
@@ -55,12 +54,6 @@ struct BulletShooter(bool, f32);
 
 #[derive(Component)]
 struct Target(Option<Entity>);
-
-#[derive(Component)]
-struct Bullet {
-    filter: bool,
-    owner: Entity,
-}
 
 #[derive(Component)]
 struct BulletFilter(bool);
