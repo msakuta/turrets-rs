@@ -18,11 +18,14 @@ pub(crate) fn spawn_enemies(
     if MAX_ENEMIES <= enemy_count {
         return;
     }
-    let num = poisson_random(time.delta_seconds() * 3.).min(MAX_ENEMIES - enemy_count);
-    if num == 0 {
+    let difficulty = if let Level::Running { difficulty, .. } = level.as_ref() {
+        difficulty
+    } else {
         return;
-    }
-    if let Level::Select = level.as_ref() {
+    };
+    let num = poisson_random(time.delta_seconds() * (0.5 + *difficulty as f32))
+        .min(MAX_ENEMIES - enemy_count);
+    if num == 0 {
         return;
     }
 
