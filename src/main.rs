@@ -5,10 +5,10 @@ mod tower;
 mod ui;
 
 use crate::{
-    bullet::bullet_collision,
+    bullet::{bullet_collision, shoot_bullet},
     enemy::{enemy_system, spawn_enemies, Enemy},
     mouse::MousePlugin,
-    tower::{update_health_bar, Shotgun, Timeout, TowerPlugin},
+    tower::{update_health_bar, Timeout, TowerPlugin},
     ui::UIPlugin,
 };
 use bevy::prelude::*;
@@ -36,6 +36,10 @@ fn main() {
         .add_system(cleanup::<Bullet>)
         .run();
 }
+
+/// Marker component for objects that should be cleared on starting game
+#[derive(Component)]
+struct StageClear;
 
 #[derive(Component, Clone, Copy, Debug)]
 struct Position(Vec2);
@@ -106,7 +110,7 @@ impl Level {
         }
     }
 
-    fn is_running(&self) -> bool {
+    fn _is_running(&self) -> bool {
         if let Self::Running { .. } = self {
             true
         } else {
@@ -200,74 +204,6 @@ fn sprite_transform_single(
     }
     trans = trans.with_scale(Vec3::new(3., 3., 3.));
     *transform = trans;
-}
-
-const SHOOT_INTERVAL: f32 = 0.5;
-const SHOTGUN_SHOOT_INTERVAL: f32 = 1.5;
-const BULLET_SPEED: f32 = 500.;
-
-fn shoot_bullet(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    time: Res<Time>,
-    mut query: Query<(
-        Entity,
-        &Position,
-        Option<&Rotation>,
-        &mut BulletShooter,
-        Option<&Shotgun>,
-    )>,
-) {
-    let delta = time.delta_seconds();
-    for (entity, position, rotation, mut bullet_shooter, shotgun) in query.iter_mut() {
-        if !bullet_shooter.0 {
-            continue;
-        }
-        if bullet_shooter.1 < delta {
-            let mut shoot = |file, angle: f64| {
-                let bullet_rotation = Rotation(angle);
-                let mut transform = default();
-                sprite_transform_single(position, Some(&bullet_rotation), &mut transform, 0.);
-                commands
-                    .spawn_bundle(SpriteBundle {
-                        texture: asset_server.load(file),
-                        transform,
-                        ..default()
-                    })
-                    .insert(*position)
-                    .insert(bullet_rotation)
-                    .insert(Velocity(
-                        BULLET_SPEED * Vec2::new(angle.cos() as f32, angle.sin() as f32),
-                    ))
-                    .insert(Bullet {
-                        filter: rotation.is_some(),
-                        owner: entity,
-                    });
-            };
-
-            if let Some(rotation) = rotation {
-                if shotgun.is_some() {
-                    for i in -3..=3 {
-                        shoot(
-                            "shotgun-bullet.png",
-                            rotation.0 + i as f64 * std::f64::consts::PI / 20.,
-                        );
-                    }
-                    bullet_shooter.1 += SHOTGUN_SHOOT_INTERVAL;
-                } else {
-                    shoot("bullet.png", rotation.0);
-                    bullet_shooter.1 += SHOOT_INTERVAL;
-                }
-            } else {
-                shoot(
-                    "enemy-bullet.png",
-                    rand::random::<f64>() * std::f64::consts::PI * 2.,
-                );
-                bullet_shooter.1 += SHOOT_INTERVAL * rand::random::<f32>();
-            }
-        }
-        bullet_shooter.1 -= delta;
-    }
 }
 
 fn animate_sprite(

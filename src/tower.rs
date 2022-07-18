@@ -2,8 +2,8 @@ mod healer;
 
 use self::healer::{heal_target, healer_find_target};
 use crate::{
-    BulletFilter, BulletShooter, Enemy, Health, Level, Position, Rotation, Scoreboard, Target,
-    SHOOT_INTERVAL,
+    bullet::SHOOT_INTERVAL, BulletFilter, BulletShooter, Enemy, Health, Level, Position, Rotation,
+    Scoreboard, StageClear, Target,
 };
 use bevy::prelude::*;
 
@@ -34,6 +34,7 @@ pub(crate) struct TowerBundle {
     health: Health,
     target: Target,
     bullet_filter: BulletFilter,
+    stage_clear: StageClear,
 }
 
 impl TowerBundle {
@@ -53,6 +54,7 @@ impl TowerBundle {
             health,
             target: Target(None),
             bullet_filter: BulletFilter(false),
+            stage_clear: StageClear,
         }
     }
 }
@@ -160,6 +162,7 @@ fn health_bar(commands: &mut Commands) -> (Entity, Entity) {
                 ..default()
             })
             .insert(TowerHealthBar)
+            .insert(StageClear)
             .id(),
         commands
             .spawn_bundle(SpriteBundle {
@@ -171,6 +174,7 @@ fn health_bar(commands: &mut Commands) -> (Entity, Entity) {
                 ..default()
             })
             .insert(TowerHealthBar)
+            .insert(StageClear)
             .id(),
     )
 }

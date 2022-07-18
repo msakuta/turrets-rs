@@ -2,8 +2,8 @@ use bevy::prelude::*;
 
 use crate::{
     mouse::SelectedTower,
-    tower::{spawn_towers, Tower, TowerHealthBar, TowerScore},
-    Bullet, Enemy, Health, Level, Scoreboard, Timeout,
+    tower::{spawn_towers, TowerScore},
+    Health, Level, Scoreboard, StageClear,
 };
 
 pub(crate) struct UIPlugin;
@@ -440,27 +440,13 @@ fn quit_button_system(
 fn quit_event_system(
     mut event: ResMut<QuitEvent>,
     mut commands: Commands,
-    query: Query<(
-        Entity,
-        Option<&Tower>,
-        Option<&Enemy>,
-        Option<&Bullet>,
-        Option<&Timeout>,
-        Option<&TowerHealthBar>,
-    )>,
+    query: Query<Entity, With<StageClear>>,
     mut level: ResMut<Level>,
 ) {
     if event.0 {
         event.0 = false;
-        for query_res in query.iter() {
-            match query_res {
-                (entity, Some(_), _, _, _, _)
-                | (entity, _, Some(_), _, _, _)
-                | (entity, _, _, Some(_), _, _)
-                | (entity, _, _, _, Some(_), _)
-                | (entity, _, _, _, _, Some(_)) => commands.entity(entity).despawn(),
-                _ => (),
-            }
+        for entity in query.iter() {
+            commands.entity(entity).despawn();
         }
         *level = Level::Select;
     }
@@ -469,29 +455,15 @@ fn quit_event_system(
 fn difficulty_event_system(
     mut event: ResMut<StartEvent>,
     mut commands: Commands,
-    query: Query<(
-        Entity,
-        Option<&Tower>,
-        Option<&Enemy>,
-        Option<&Bullet>,
-        Option<&Timeout>,
-        Option<&TowerHealthBar>,
-    )>,
+    query: Query<Entity, With<StageClear>>,
     mut level: ResMut<Level>,
     mut scoreboard: ResMut<Scoreboard>,
     asset_server: Res<AssetServer>,
 ) {
     if event.0 {
         event.0 = false;
-        for query_res in query.iter() {
-            match query_res {
-                (entity, Some(_), _, _, _, _)
-                | (entity, _, Some(_), _, _, _)
-                | (entity, _, _, Some(_), _, _)
-                | (entity, _, _, _, Some(_), _)
-                | (entity, _, _, _, _, Some(_)) => commands.entity(entity).despawn(),
-                _ => (),
-            }
+        for entity in query.iter() {
+            commands.entity(entity).despawn();
         }
         *level = Level::start(event.1);
         scoreboard.score = 0.;
