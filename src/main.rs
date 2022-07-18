@@ -24,6 +24,7 @@ fn main() {
         .add_system(time_level)
         .add_system(erase_entities_new_game::<Enemy>)
         .add_system(erase_entities_new_game::<Bullet>)
+        .add_system(reset_game)
         .add_system(spawn_enemies)
         .add_system(enemy_system)
         .add_system(linear_motion)
@@ -87,12 +88,13 @@ struct Scoreboard {
 
 enum Level {
     Select,
-    Running { timer: Timer },
+    Running { difficulty: usize, timer: Timer },
 }
 
 impl Level {
-    fn start() -> Self {
+    fn start(difficulty: usize) -> Self {
         Self::Running {
+            difficulty,
             timer: Timer::from_seconds(120., true),
         }
     }
@@ -100,7 +102,15 @@ impl Level {
     fn timer_finished(&self) -> bool {
         match self {
             Self::Select => false,
-            Self::Running { timer } => timer.just_finished(),
+            Self::Running { timer, .. } => timer.just_finished(),
+        }
+    }
+
+    fn is_running(&self) -> bool {
+        if let Self::Running { .. } = self {
+            true
+        } else {
+            false
         }
     }
 }
@@ -130,7 +140,7 @@ fn setup(
 }
 
 fn time_level(mut level: ResMut<Level>, time: Res<Time>) {
-    if let Level::Running { timer } = level.as_mut() {
+    if let Level::Running { timer, .. } = level.as_mut() {
         timer.tick(time.delta());
     }
 }
@@ -141,10 +151,16 @@ fn erase_entities_new_game<T: Component>(
     query: Query<Entity, With<T>>,
 ) {
     if level.timer_finished() {
-        println!("Round finished!");
         for entity in query.iter() {
             commands.entity(entity).despawn();
         }
+    }
+}
+
+fn reset_game(mut level: ResMut<Level>) {
+    if level.timer_finished() {
+        println!("Round finished!");
+        *level = Level::Select;
     }
 }
 

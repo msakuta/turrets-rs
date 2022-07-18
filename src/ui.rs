@@ -10,16 +10,37 @@ pub(crate) struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(StartEvent(false));
+        app.insert_resource(StartEvent(false, 0));
+        app.insert_resource(QuitEvent(false));
         app.add_startup_system(build_ui);
         app.add_system(update_progress_bar);
+        app.add_system(update_level);
         app.add_system(update_scoreboard);
         app.add_system(update_tower_scoreboard);
         app.add_system(update_tower_health);
-        app.add_system(button_system);
-        app.add_system(start_event_system);
+        app.add_system(quit_event_system);
+        app.add_system(quit_button_system);
+        app.add_system(difficulty_button_system);
+        app.add_system(show_quit_button_system);
+        app.add_system(show_difficulty_buttons_system);
+        app.add_system(difficulty_event_system);
     }
 }
+
+#[derive(Component)]
+struct QuitButtonFilter;
+
+#[derive(Component)]
+struct DifficultyButton {
+    color: UiColor,
+    difficulty: usize,
+}
+
+#[derive(Component)]
+struct DifficultyButtonFilter;
+
+#[derive(Component)]
+struct LevelText;
 
 #[derive(Component)]
 struct ScoreText;
@@ -42,45 +63,100 @@ const STATUS_FONT_SIZE: f32 = 20.0;
 
 const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
-const PRESSED_BUTTON: Color = Color::rgb(0.35, 0.75, 0.35);
 
 fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Scoreboard
     commands
-        .spawn_bundle(TextBundle {
-            text: Text {
-                sections: vec![
-                    TextSection {
-                        value: "Score: ".to_string(),
-                        style: TextStyle {
-                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                            font_size: SCOREBOARD_FONT_SIZE,
-                            color: TEXT_COLOR,
-                        },
-                    },
-                    TextSection {
-                        value: "".to_string(),
-                        style: TextStyle {
-                            font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                            font_size: SCOREBOARD_FONT_SIZE,
-                            color: SCORE_COLOR,
-                        },
-                    },
-                ],
-                ..default()
-            },
+        .spawn_bundle(NodeBundle {
             style: Style {
+                margin: Rect::all(Val::Auto),
                 position_type: PositionType::Absolute,
                 position: Rect {
                     top: SCOREBOARD_TEXT_PADDING,
                     left: SCOREBOARD_TEXT_PADDING,
                     ..default()
                 },
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::FlexStart,
+                flex_direction: FlexDirection::ColumnReverse,
                 ..default()
             },
+            color: Color::rgba(0., 0., 0., 0.5).into(),
             ..default()
         })
-        .insert(ScoreText);
+        .with_children(|parent| {
+            parent
+                .spawn_bundle(TextBundle {
+                    text: Text {
+                        sections: vec![
+                            TextSection {
+                                value: "Level: ".to_string(),
+                                style: TextStyle {
+                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                                    font_size: SCOREBOARD_FONT_SIZE,
+                                    color: TEXT_COLOR,
+                                },
+                            },
+                            TextSection {
+                                value: "".to_string(),
+                                style: TextStyle {
+                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                                    font_size: SCOREBOARD_FONT_SIZE,
+                                    color: SCORE_COLOR,
+                                },
+                            },
+                        ],
+                        ..default()
+                    },
+                    // style: Style {
+                    //     position_type: PositionType::Absolute,
+                    //     position: Rect {
+                    //         top: SCOREBOARD_TEXT_PADDING,
+                    //         left: SCOREBOARD_TEXT_PADDING,
+                    //         ..default()
+                    //     },
+                    //     ..default()
+                    // },
+                    ..default()
+                })
+                .insert(LevelText);
+
+            parent
+                .spawn_bundle(TextBundle {
+                    text: Text {
+                        sections: vec![
+                            TextSection {
+                                value: "Score: ".to_string(),
+                                style: TextStyle {
+                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                                    font_size: SCOREBOARD_FONT_SIZE,
+                                    color: TEXT_COLOR,
+                                },
+                            },
+                            TextSection {
+                                value: "".to_string(),
+                                style: TextStyle {
+                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                                    font_size: SCOREBOARD_FONT_SIZE,
+                                    color: SCORE_COLOR,
+                                },
+                            },
+                        ],
+                        ..default()
+                    },
+                    // style: Style {
+                    //     position_type: PositionType::Absolute,
+                    //     position: Rect {
+                    //         top: SCOREBOARD_TEXT_PADDING,
+                    //         left: SCOREBOARD_TEXT_PADDING,
+                    //         ..default()
+                    //     },
+                    //     ..default()
+                    // },
+                    ..default()
+                })
+                .insert(ScoreText);
+        });
 
     commands
         .spawn_bundle(NodeBundle {
@@ -111,7 +187,7 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 .insert(ProgressBar);
         });
 
-    // Start button
+    // Quit button
     commands
         .spawn_bundle(ButtonBundle {
             style: Style {
@@ -130,19 +206,71 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
             color: NORMAL_BUTTON.into(),
             ..default()
         })
+        .insert(QuitButtonFilter)
         .with_children(|parent| {
-            parent.spawn_bundle(TextBundle {
-                text: Text::with_section(
-                    "Start",
-                    TextStyle {
-                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                        font_size: SCOREBOARD_FONT_SIZE,
-                        color: TEXT_COLOR,
-                    },
-                    Default::default(),
-                ),
+            parent
+                .spawn_bundle(TextBundle {
+                    text: Text::with_section(
+                        "Quit",
+                        TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: SCOREBOARD_FONT_SIZE,
+                            color: TEXT_COLOR,
+                        },
+                        Default::default(),
+                    ),
+                    ..default()
+                })
+                .insert(QuitButtonFilter);
+        });
+
+    // Difficulty buttons
+    commands
+        .spawn_bundle(NodeBundle {
+            style: Style {
+                margin: Rect::all(Val::Auto),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                flex_direction: FlexDirection::ColumnReverse,
                 ..default()
-            });
+            },
+            ..default()
+        })
+        .insert(DifficultyButtonFilter)
+        .with_children(|parent| {
+            for difficulty in 0..3 {
+                let color = Color::rgb(0.15 + difficulty as f32 / 3. * 0.85, 0.15, 0.15).into();
+                parent
+                    .spawn_bundle(ButtonBundle {
+                        style: Style {
+                            size: Size::new(Val::Px(300.0), Val::Px(65.0)),
+                            margin: Rect::all(Val::Auto),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            ..default()
+                        },
+                        color,
+                        ..default()
+                    })
+                    .insert(DifficultyButton { color, difficulty })
+                    .insert(DifficultyButtonFilter)
+                    .with_children(|parent| {
+                        parent
+                            .spawn_bundle(TextBundle {
+                                text: Text::with_section(
+                                    &format!("Start Level {}", difficulty),
+                                    TextStyle {
+                                        font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                                        font_size: SCOREBOARD_FONT_SIZE,
+                                        color: TEXT_COLOR,
+                                    },
+                                    Default::default(),
+                                ),
+                                ..default()
+                            })
+                            .insert(DifficultyButtonFilter);
+                    });
+            }
         });
 
     commands
@@ -224,8 +352,18 @@ fn update_progress_bar(level: Res<Level>, mut query: Query<&mut Style, With<Prog
     let bar = query.get_single_mut();
     // println!("bar: {bar:?}");
     if let Ok(mut bar) = bar {
-        if let Level::Running { timer } = level.as_ref() {
+        if let Level::Running { timer, .. } = level.as_ref() {
             bar.size.width = Val::Percent(timer.percent() * 100.);
+        }
+    }
+}
+
+fn update_level(level: Res<Level>, mut query: Query<&mut Text, With<LevelText>>) {
+    if let Ok(mut text) = query.get_single_mut() {
+        text.sections[1].value = if let Level::Running { difficulty, .. } = level.as_ref() {
+            format!("{}", difficulty)
+        } else {
+            "-".to_string()
         }
     }
 }
@@ -270,9 +408,65 @@ fn update_tower_health(
     }
 }
 
-struct StartEvent(bool);
+struct StartEvent(bool, usize);
+struct QuitEvent(bool);
 
-fn start_event_system(
+fn quit_button_system(
+    mut interaction_query: Query<
+        (&Interaction, &mut UiColor),
+        (Changed<Interaction>, With<Button>, With<QuitButtonFilter>),
+    >,
+    mut event: ResMut<QuitEvent>,
+    level: Res<Level>,
+) {
+    if let Level::Select = level.as_ref() {
+        return;
+    }
+    for (interaction, mut color) in interaction_query.iter_mut() {
+        match *interaction {
+            Interaction::Clicked => {
+                event.0 = true;
+            }
+            Interaction::Hovered => {
+                *color = HOVERED_BUTTON.into();
+            }
+            Interaction::None => {
+                *color = NORMAL_BUTTON.into();
+            }
+        }
+    }
+}
+
+fn quit_event_system(
+    mut event: ResMut<QuitEvent>,
+    mut commands: Commands,
+    query: Query<(
+        Entity,
+        Option<&Tower>,
+        Option<&Enemy>,
+        Option<&Bullet>,
+        Option<&Timeout>,
+        Option<&TowerHealthBar>,
+    )>,
+    mut level: ResMut<Level>,
+) {
+    if event.0 {
+        event.0 = false;
+        for query_res in query.iter() {
+            match query_res {
+                (entity, Some(_), _, _, _, _)
+                | (entity, _, Some(_), _, _, _)
+                | (entity, _, _, Some(_), _, _)
+                | (entity, _, _, _, Some(_), _)
+                | (entity, _, _, _, _, Some(_)) => commands.entity(entity).despawn(),
+                _ => (),
+            }
+        }
+        *level = Level::Select;
+    }
+}
+
+fn difficulty_event_system(
     mut event: ResMut<StartEvent>,
     mut commands: Commands,
     query: Query<(
@@ -288,7 +482,6 @@ fn start_event_system(
     asset_server: Res<AssetServer>,
 ) {
     if event.0 {
-        println!("Clearing");
         event.0 = false;
         for query_res in query.iter() {
             match query_res {
@@ -300,31 +493,60 @@ fn start_event_system(
                 _ => (),
             }
         }
-        *level = Level::start();
+        *level = Level::start(event.1);
         scoreboard.score = 0.;
         spawn_towers(&mut commands, &asset_server);
     }
 }
 
-fn button_system(
+fn difficulty_button_system(
     mut interaction_query: Query<
-        (&Interaction, &mut UiColor),
+        (&Interaction, &mut UiColor, &DifficultyButton),
         (Changed<Interaction>, With<Button>),
     >,
     mut event: ResMut<StartEvent>,
+    level: Res<Level>,
 ) {
-    for (interaction, mut color) in interaction_query.iter_mut() {
-        match *interaction {
-            Interaction::Clicked => {
-                event.0 = true;
-                *color = PRESSED_BUTTON.into();
-            }
-            Interaction::Hovered => {
-                *color = HOVERED_BUTTON.into();
-            }
-            Interaction::None => {
-                *color = NORMAL_BUTTON.into();
+    if let Level::Select = level.as_ref() {
+        for (interaction, mut color, difficulty) in interaction_query.iter_mut() {
+            match *interaction {
+                Interaction::Clicked => {
+                    event.0 = true;
+                    event.1 = difficulty.difficulty;
+                }
+                Interaction::Hovered => {
+                    *color = HOVERED_BUTTON.into();
+                }
+                Interaction::None => {
+                    *color = difficulty.color;
+                }
             }
         }
+    }
+}
+
+fn show_quit_button_system(
+    mut button_query: Query<&mut Visibility, With<QuitButtonFilter>>,
+    level: Res<Level>,
+) {
+    for mut button in button_query.iter_mut() {
+        button.is_visible = if let Level::Select = level.as_ref() {
+            false
+        } else {
+            true
+        };
+    }
+}
+
+fn show_difficulty_buttons_system(
+    mut button_query: Query<&mut Visibility, With<DifficultyButtonFilter>>,
+    level: Res<Level>,
+) {
+    for mut button in button_query.iter_mut() {
+        button.is_visible = if let Level::Select = level.as_ref() {
+            true
+        } else {
+            false
+        };
     }
 }
