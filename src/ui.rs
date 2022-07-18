@@ -1,8 +1,9 @@
 use bevy::prelude::*;
 
 use crate::{
+    mouse::SelectedTower,
     tower::{spawn_towers, Tower, TowerHealthBar, TowerScore},
-    Bullet, Enemy, Level, Scoreboard, SelectedTower, Timeout,
+    Bullet, Enemy, Level, Scoreboard, Timeout,
 };
 
 pub(crate) struct UIPlugin;

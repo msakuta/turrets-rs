@@ -1,12 +1,14 @@
 mod bullet;
 mod enemy;
+mod mouse;
 mod tower;
 mod ui;
 
 use crate::{
     bullet::bullet_collision,
     enemy::{enemy_system, spawn_enemies, Enemy},
-    tower::{update_health_bar, Shotgun, Timeout, Tower, TowerPlugin},
+    mouse::MousePlugin,
+    tower::{update_health_bar, Shotgun, Timeout, TowerPlugin},
     ui::UIPlugin,
 };
 use bevy::prelude::*;
@@ -17,6 +19,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugin(UIPlugin)
         .add_plugin(TowerPlugin)
+        .add_plugin(MousePlugin)
         .add_startup_system(setup)
         .add_system(time_level)
         .add_system(erase_entities_new_game::<Enemy>)
@@ -30,8 +33,6 @@ fn main() {
         .add_system(animate_sprite)
         .add_system(update_health_bar)
         .add_system(cleanup::<Bullet>)
-        .insert_resource(SelectedTower { tower: None })
-        .add_system(mouse_position)
         .run();
 }
 
@@ -104,9 +105,6 @@ impl Level {
     }
 }
 
-#[derive(Component)]
-struct MouseCursor;
-
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -127,17 +125,6 @@ fn setup(
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
     commands.spawn_bundle(UiCameraBundle::default());
-
-    commands
-        .spawn_bundle(SpriteBundle {
-            texture: asset_server.load("select-marker.png"),
-            visibility: Visibility {
-                is_visible: false,
-                ..default()
-            },
-            ..default()
-        })
-        .insert(MouseCursor);
 
     // spawn_towers(&mut commands, &asset_server);
 }
@@ -311,50 +298,5 @@ fn cleanup<T: Component>(
             commands.entity(entity).despawn();
             // println!("Despawned {entity:?} ({})", std::any::type_name::<T>());
         }
-    }
-}
-
-struct SelectedTower {
-    tower: Option<Entity>,
-}
-
-fn mouse_position(
-    windows: Res<Windows>,
-    mut query: Query<(&mut Transform, &mut Visibility), With<MouseCursor>>,
-    query_towers: Query<(Entity, &Position), With<Tower>>,
-    btn: Res<Input<MouseButton>>,
-    mut selected_tower: ResMut<SelectedTower>,
-) {
-    let window = if let Some(window) = windows.iter().next() {
-        window
-    } else {
-        return;
-    };
-    let mouse = window.cursor_position();
-
-    if let Some(((mut cursor_transform, mut visibility), mouse_position)) =
-        query.get_single_mut().ok().zip(mouse)
-    {
-        let (width, height) = (window.width(), window.height());
-        let mouse_screen = Vec2::new(
-            mouse_position.x - width / 2.,
-            mouse_position.y - height / 2.,
-        );
-        // println!("Mouse: {:?} -> {:?}", mouse_position, mouse_screen);
-        for (entity, tower_position) in query_towers.iter() {
-            if tower_position.0.distance(mouse_screen) < 30. {
-                visibility.is_visible = true;
-                *cursor_transform = Transform::from_xyz(tower_position.0.x, tower_position.0.y, 0.)
-                    .with_scale(Vec3::new(2., 2., 1.));
-
-                selected_tower.tower = Some(entity);
-
-                if btn.just_pressed(MouseButton::Left) {
-                    println!("Just_pressed! {:?} -> {:?}", mouse_position, mouse_screen);
-                }
-                return;
-            }
-        }
-        visibility.is_visible = false;
     }
 }
