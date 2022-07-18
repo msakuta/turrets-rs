@@ -56,6 +56,9 @@ impl BulletShooter {
     }
 }
 
+#[derive(Component)]
+pub(crate) struct TowerHealthBar;
+
 pub(crate) struct TowerPlugin;
 
 impl Plugin for TowerPlugin {
@@ -76,7 +79,7 @@ fn spawn_towers_new_game(
     mut scoreboard: ResMut<Scoreboard>,
     asset_server: Res<AssetServer>,
 ) {
-    if level.timer.just_finished() {
+    if level.timer_finished() {
         println!("Round finished!");
         if query.iter().next().is_none() {
             spawn_towers(&mut commands, &asset_server);
@@ -149,6 +152,7 @@ fn health_bar(commands: &mut Commands) -> (Entity, Entity) {
                 },
                 ..default()
             })
+            .insert(TowerHealthBar)
             .id(),
         commands
             .spawn_bundle(SpriteBundle {
@@ -159,6 +163,7 @@ fn health_bar(commands: &mut Commands) -> (Entity, Entity) {
                 },
                 ..default()
             })
+            .insert(TowerHealthBar)
             .id(),
     )
 }

@@ -1,4 +1,4 @@
-use crate::{BulletFilter, BulletShooter, Health, Position, Velocity, SHOOT_INTERVAL};
+use crate::{BulletFilter, BulletShooter, Health, Level, Position, Velocity, SHOOT_INTERVAL};
 use bevy::prelude::*;
 
 #[derive(Component)]
@@ -12,6 +12,7 @@ pub(crate) fn spawn_enemies(
     asset_server: Res<AssetServer>,
     windows: Res<Windows>,
     time: Res<Time>,
+    level: Res<Level>,
 ) {
     let enemy_count = query.iter().count();
     if MAX_ENEMIES <= enemy_count {
@@ -19,6 +20,9 @@ pub(crate) fn spawn_enemies(
     }
     let num = poisson_random(time.delta_seconds() * 3.).min(MAX_ENEMIES - enemy_count);
     if num == 0 {
+        return;
+    }
+    if let Level::Select = level.as_ref() {
         return;
     }
 

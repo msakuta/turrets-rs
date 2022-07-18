@@ -6,7 +6,7 @@ mod ui;
 use crate::{
     bullet::bullet_collision,
     enemy::{enemy_system, spawn_enemies, Enemy},
-    tower::{spawn_towers, update_health_bar, Healer, Shotgun, Timeout, TowerBundle, TowerPlugin},
+    tower::{update_health_bar, Shotgun, Timeout, TowerPlugin},
     ui::UIPlugin,
 };
 use bevy::prelude::*;
@@ -28,7 +28,6 @@ fn main() {
         .add_system(shoot_bullet)
         .add_system(bullet_collision)
         .add_system(animate_sprite)
-        .add_system(update_scoreboard)
         .add_system(update_health_bar)
         .add_system(cleanup::<Bullet>)
         .run();
@@ -80,8 +79,24 @@ struct Scoreboard {
     score: f64,
 }
 
-struct Level {
-    timer: Timer,
+enum Level {
+    Select,
+    Running { timer: Timer },
+}
+
+impl Level {
+    fn start() -> Self {
+        Self::Running {
+            timer: Timer::from_seconds(120., true),
+        }
+    }
+
+    fn timer_finished(&self) -> bool {
+        match self {
+            Self::Select => false,
+            Self::Running { timer } => timer.just_finished(),
+        }
+    }
 }
 
 fn setup(
@@ -100,18 +115,18 @@ fn setup(
         large_explosion: gen_texture_handle("explode2.png", 32., 6),
     });
     commands.insert_resource(Scoreboard { score: 0. });
-    commands.insert_resource(Level {
-        timer: Timer::from_seconds(120., true),
-    });
+    commands.insert_resource(Level::Select);
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
     commands.spawn_bundle(UiCameraBundle::default());
 
-    spawn_towers(&mut commands, &asset_server);
+    // spawn_towers(&mut commands, &asset_server);
 }
 
 fn time_level(mut level: ResMut<Level>, time: Res<Time>) {
-    level.timer.tick(time.delta());
+    if let Level::Running { timer } = level.as_mut() {
+        timer.tick(time.delta());
+    }
 }
 
 fn erase_entities_new_game<T: Component>(
@@ -119,7 +134,7 @@ fn erase_entities_new_game<T: Component>(
     level: Res<Level>,
     query: Query<Entity, With<T>>,
 ) {
-    if level.timer.just_finished() {
+    if level.timer_finished() {
         println!("Round finished!");
         for entity in query.iter() {
             commands.entity(entity).despawn();
@@ -251,11 +266,6 @@ fn animate_sprite(
             }
         }
     }
-}
-
-fn update_scoreboard(scoreboard: Res<Scoreboard>, mut query: Query<&mut Text>) {
-    let mut text = query.single_mut();
-    text.sections[1].value = format!("{}", scoreboard.score);
 }
 
 fn cleanup<T: Component>(
