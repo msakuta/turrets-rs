@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::{
     mouse::SelectedTower,
     tower::{spawn_towers, Tower, TowerHealthBar, TowerScore},
-    Bullet, Enemy, Level, Scoreboard, Timeout,
+    Bullet, Enemy, Health, Level, Scoreboard, Timeout,
 };
 
 pub(crate) struct UIPlugin;
@@ -15,6 +15,7 @@ impl Plugin for UIPlugin {
         app.add_system(update_progress_bar);
         app.add_system(update_scoreboard);
         app.add_system(update_tower_scoreboard);
+        app.add_system(update_tower_health);
         app.add_system(button_system);
         app.add_system(start_event_system);
     }
@@ -22,6 +23,9 @@ impl Plugin for UIPlugin {
 
 #[derive(Component)]
 struct ScoreText;
+
+#[derive(Component)]
+struct TowerHealthText;
 
 #[derive(Component)]
 struct TowerScoreText;
@@ -142,32 +146,11 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
         });
 
     commands
-        .spawn_bundle(TextBundle {
-            text: Text {
-                sections: vec![
-                    TextSection {
-                        value: "Kills: ".to_string(),
-                        style: TextStyle {
-                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                            font_size: STATUS_FONT_SIZE,
-                            color: TEXT_COLOR,
-                        },
-                    },
-                    TextSection {
-                        value: "".to_string(),
-                        style: TextStyle {
-                            font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                            font_size: STATUS_FONT_SIZE,
-                            color: SCORE_COLOR,
-                        },
-                    },
-                ],
-                ..default()
-            },
+        .spawn_bundle(NodeBundle {
             style: Style {
                 // justify_content: JustifyContent::Center,
-                // align_items: AlignItems::Center,
-                // flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexStart,
+                flex_direction: FlexDirection::Column,
                 position_type: PositionType::Absolute,
                 position: Rect {
                     top: Val::Px(80.0),
@@ -176,9 +159,64 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 },
                 ..default()
             },
+            color: Color::rgba(0., 0., 0., 0.5).into(),
             ..default()
         })
-        .insert(TowerScoreText);
+        .with_children(|parent| {
+            parent
+                .spawn_bundle(TextBundle {
+                    text: Text {
+                        sections: vec![
+                            TextSection {
+                                value: "Health: ".to_string(),
+                                style: TextStyle {
+                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                                    font_size: STATUS_FONT_SIZE,
+                                    color: TEXT_COLOR,
+                                },
+                            },
+                            TextSection {
+                                value: "".to_string(),
+                                style: TextStyle {
+                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                                    font_size: STATUS_FONT_SIZE,
+                                    color: SCORE_COLOR,
+                                },
+                            },
+                        ],
+                        ..default()
+                    },
+                    ..default()
+                })
+                .insert(TowerHealthText);
+
+            parent
+                .spawn_bundle(TextBundle {
+                    text: Text {
+                        sections: vec![
+                            TextSection {
+                                value: "Kills: ".to_string(),
+                                style: TextStyle {
+                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                                    font_size: STATUS_FONT_SIZE,
+                                    color: TEXT_COLOR,
+                                },
+                            },
+                            TextSection {
+                                value: "".to_string(),
+                                style: TextStyle {
+                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                                    font_size: STATUS_FONT_SIZE,
+                                    color: SCORE_COLOR,
+                                },
+                            },
+                        ],
+                        ..default()
+                    },
+                    ..default()
+                })
+                .insert(TowerScoreText);
+        });
 }
 
 fn update_progress_bar(level: Res<Level>, mut query: Query<&mut Style, With<ProgressBar>>) {
@@ -201,17 +239,33 @@ fn update_scoreboard(scoreboard: Res<Scoreboard>, mut query: Query<&mut Text, Wi
 fn update_tower_scoreboard(
     selected_tower: Res<SelectedTower>,
     tower_score_query: Query<&TowerScore>,
-    mut text_query: Query<(&mut Text, &mut Visibility), With<TowerScoreText>>,
+    mut text_query: Query<&mut Text, With<TowerScoreText>>,
 ) {
-    if let Ok((mut text, mut visibility)) = text_query.get_single_mut() {
+    if let Ok(mut text) = text_query.get_single_mut() {
         if let Some(selected_tower) = selected_tower
             .tower
             .and_then(|tower| tower_score_query.get_component::<TowerScore>(tower).ok())
         {
-            visibility.is_visible = true;
             text.sections[1].value = format!("{:?}", selected_tower.kills);
         } else {
-            visibility.is_visible = false;
+            text.sections[1].value = "".to_string();
+        }
+    }
+}
+
+fn update_tower_health(
+    selected_tower: Res<SelectedTower>,
+    tower_health_query: Query<&Health>,
+    mut text_query: Query<&mut Text, With<TowerHealthText>>,
+) {
+    if let Ok(mut text) = text_query.get_single_mut() {
+        if let Some(health) = selected_tower
+            .tower
+            .and_then(|tower| tower_health_query.get_component::<Health>(tower).ok())
+        {
+            text.sections[1].value = format!("{}/{}", health.val, health.max);
+        } else {
+            text.sections[1].value = "".to_string();
         }
     }
 }
