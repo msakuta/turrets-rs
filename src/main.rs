@@ -30,6 +30,7 @@ fn main() {
         .add_system(animate_sprite)
         .add_system(update_health_bar)
         .add_system(cleanup::<Bullet>)
+        .add_system(mouse_position)
         .run();
 }
 
@@ -99,6 +100,9 @@ impl Level {
     }
 }
 
+#[derive(Component)]
+struct MouseCursor;
+
 fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -119,6 +123,13 @@ fn setup(
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
     commands.spawn_bundle(UiCameraBundle::default());
+
+    commands
+        .spawn_bundle(SpriteBundle {
+            texture: asset_server.load("select-marker.png"),
+            ..default()
+        })
+        .insert(MouseCursor);
 
     // spawn_towers(&mut commands, &asset_server);
 }
@@ -288,5 +299,24 @@ fn cleanup<T: Component>(
             commands.entity(entity).despawn();
             // println!("Despawned {entity:?} ({})", std::any::type_name::<T>());
         }
+    }
+}
+
+fn mouse_position(windows: Res<Windows>, mut query: Query<&mut Transform, With<MouseCursor>>) {
+    let window = if let Some(window) = windows.iter().next() {
+        window
+    } else {
+        return;
+    };
+    let mouse = window.cursor_position();
+
+    if let Some((mut mouse_cursor, mouse_position)) = query.get_single_mut().ok().zip(mouse) {
+        let (width, height) = (window.width(), window.height());
+        let mouse_screen = (
+            mouse_position.x - width / 2.,
+            mouse_position.y - height / 2.,
+        );
+        println!("Mouse: {:?} -> {:?}", mouse_position, mouse_screen);
+        *mouse_cursor = Transform::from_xyz(mouse_screen.0, mouse_screen.1, 0.);
     }
 }
