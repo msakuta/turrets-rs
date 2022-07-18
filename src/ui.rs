@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
 use crate::{
-    tower::{spawn_towers, Tower, TowerHealthBar},
-    Bullet, Enemy, Level, Scoreboard, Timeout,
+    tower::{spawn_towers, Tower, TowerHealthBar, TowerScore},
+    Bullet, Enemy, Level, Scoreboard, SelectedTower, Timeout,
 };
 
 pub(crate) struct UIPlugin;
@@ -13,6 +13,7 @@ impl Plugin for UIPlugin {
         app.add_startup_system(build_ui);
         app.add_system(update_progress_bar);
         app.add_system(update_scoreboard);
+        app.add_system(update_tower_scoreboard);
         app.add_system(button_system);
         app.add_system(start_event_system);
     }
@@ -22,12 +23,17 @@ impl Plugin for UIPlugin {
 struct ScoreText;
 
 #[derive(Component)]
+struct TowerScoreText;
+
+#[derive(Component)]
 struct ProgressBar;
 
 const SCOREBOARD_FONT_SIZE: f32 = 40.0;
 const SCOREBOARD_TEXT_PADDING: Val = Val::Px(5.0);
 const TEXT_COLOR: Color = Color::rgb(0.7, 0.7, 0.7);
 const SCORE_COLOR: Color = Color::rgb(1.0, 0.5, 0.5);
+
+const STATUS_FONT_SIZE: f32 = 20.0;
 
 const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
@@ -133,6 +139,45 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 ..default()
             });
         });
+
+    commands
+        .spawn_bundle(TextBundle {
+            text: Text {
+                sections: vec![
+                    TextSection {
+                        value: "Kills: ".to_string(),
+                        style: TextStyle {
+                            font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                            font_size: STATUS_FONT_SIZE,
+                            color: TEXT_COLOR,
+                        },
+                    },
+                    TextSection {
+                        value: "".to_string(),
+                        style: TextStyle {
+                            font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                            font_size: STATUS_FONT_SIZE,
+                            color: SCORE_COLOR,
+                        },
+                    },
+                ],
+                ..default()
+            },
+            style: Style {
+                // justify_content: JustifyContent::Center,
+                // align_items: AlignItems::Center,
+                // flex_direction: FlexDirection::Column,
+                position_type: PositionType::Absolute,
+                position: Rect {
+                    top: Val::Px(80.0),
+                    right: SCOREBOARD_TEXT_PADDING,
+                    ..default()
+                },
+                ..default()
+            },
+            ..default()
+        })
+        .insert(TowerScoreText);
 }
 
 fn update_progress_bar(level: Res<Level>, mut query: Query<&mut Style, With<ProgressBar>>) {
@@ -149,6 +194,24 @@ fn update_progress_bar(level: Res<Level>, mut query: Query<&mut Style, With<Prog
 fn update_scoreboard(scoreboard: Res<Scoreboard>, mut query: Query<&mut Text, With<ScoreText>>) {
     if let Ok(mut text) = query.get_single_mut() {
         text.sections[1].value = format!("{}", scoreboard.score);
+    }
+}
+
+fn update_tower_scoreboard(
+    selected_tower: Res<SelectedTower>,
+    tower_score_query: Query<&TowerScore>,
+    mut text_query: Query<(&mut Text, &mut Visibility), With<TowerScoreText>>,
+) {
+    if let Ok((mut text, mut visibility)) = text_query.get_single_mut() {
+        if let Some(selected_tower) = selected_tower
+            .tower
+            .and_then(|tower| tower_score_query.get_component::<TowerScore>(tower).ok())
+        {
+            visibility.is_visible = true;
+            text.sections[1].value = format!("{:?}", selected_tower.kills);
+        } else {
+            visibility.is_visible = false;
+        }
     }
 }
 

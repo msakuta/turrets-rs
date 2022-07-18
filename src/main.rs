@@ -6,7 +6,7 @@ mod ui;
 use crate::{
     bullet::bullet_collision,
     enemy::{enemy_system, spawn_enemies, Enemy},
-    tower::{update_health_bar, Shotgun, Timeout, TowerPlugin},
+    tower::{update_health_bar, Shotgun, Timeout, Tower, TowerPlugin},
     ui::UIPlugin,
 };
 use bevy::prelude::*;
@@ -30,6 +30,7 @@ fn main() {
         .add_system(animate_sprite)
         .add_system(update_health_bar)
         .add_system(cleanup::<Bullet>)
+        .insert_resource(SelectedTower { tower: None })
         .add_system(mouse_position)
         .run();
 }
@@ -50,7 +51,10 @@ struct BulletShooter(bool, f32);
 struct Target(Option<Entity>);
 
 #[derive(Component)]
-struct Bullet(bool);
+struct Bullet {
+    filter: bool,
+    owner: Entity,
+}
 
 #[derive(Component)]
 struct BulletFilter(bool);
@@ -127,6 +131,10 @@ fn setup(
     commands
         .spawn_bundle(SpriteBundle {
             texture: asset_server.load("select-marker.png"),
+            visibility: Visibility {
+                is_visible: false,
+                ..default()
+            },
             ..default()
         })
         .insert(MouseCursor);
@@ -200,6 +208,7 @@ fn shoot_bullet(
     asset_server: Res<AssetServer>,
     time: Res<Time>,
     mut query: Query<(
+        Entity,
         &Position,
         Option<&Rotation>,
         &mut BulletShooter,
@@ -207,7 +216,7 @@ fn shoot_bullet(
     )>,
 ) {
     let delta = time.delta_seconds();
-    for (position, rotation, mut bullet_shooter, shotgun) in query.iter_mut() {
+    for (entity, position, rotation, mut bullet_shooter, shotgun) in query.iter_mut() {
         if !bullet_shooter.0 {
             continue;
         }
@@ -227,7 +236,10 @@ fn shoot_bullet(
                     .insert(Velocity(
                         BULLET_SPEED * Vec2::new(angle.cos() as f32, angle.sin() as f32),
                     ))
-                    .insert(Bullet(rotation.is_some()));
+                    .insert(Bullet {
+                        filter: rotation.is_some(),
+                        owner: entity,
+                    });
             };
 
             if let Some(rotation) = rotation {
@@ -302,7 +314,17 @@ fn cleanup<T: Component>(
     }
 }
 
-fn mouse_position(windows: Res<Windows>, mut query: Query<&mut Transform, With<MouseCursor>>) {
+struct SelectedTower {
+    tower: Option<Entity>,
+}
+
+fn mouse_position(
+    windows: Res<Windows>,
+    mut query: Query<(&mut Transform, &mut Visibility), With<MouseCursor>>,
+    query_towers: Query<(Entity, &Position), With<Tower>>,
+    btn: Res<Input<MouseButton>>,
+    mut selected_tower: ResMut<SelectedTower>,
+) {
     let window = if let Some(window) = windows.iter().next() {
         window
     } else {
@@ -310,13 +332,29 @@ fn mouse_position(windows: Res<Windows>, mut query: Query<&mut Transform, With<M
     };
     let mouse = window.cursor_position();
 
-    if let Some((mut mouse_cursor, mouse_position)) = query.get_single_mut().ok().zip(mouse) {
+    if let Some(((mut cursor_transform, mut visibility), mouse_position)) =
+        query.get_single_mut().ok().zip(mouse)
+    {
         let (width, height) = (window.width(), window.height());
-        let mouse_screen = (
+        let mouse_screen = Vec2::new(
             mouse_position.x - width / 2.,
             mouse_position.y - height / 2.,
         );
-        println!("Mouse: {:?} -> {:?}", mouse_position, mouse_screen);
-        *mouse_cursor = Transform::from_xyz(mouse_screen.0, mouse_screen.1, 0.);
+        // println!("Mouse: {:?} -> {:?}", mouse_position, mouse_screen);
+        for (entity, tower_position) in query_towers.iter() {
+            if tower_position.0.distance(mouse_screen) < 30. {
+                visibility.is_visible = true;
+                *cursor_transform = Transform::from_xyz(tower_position.0.x, tower_position.0.y, 0.)
+                    .with_scale(Vec3::new(2., 2., 1.));
+
+                selected_tower.tower = Some(entity);
+
+                if btn.just_pressed(MouseButton::Left) {
+                    println!("Just_pressed! {:?} -> {:?}", mouse_position, mouse_screen);
+                }
+                return;
+            }
+        }
+        visibility.is_visible = false;
     }
 }

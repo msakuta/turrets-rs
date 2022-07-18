@@ -15,6 +15,11 @@ pub(crate) struct Tower {
 }
 
 #[derive(Component)]
+pub(crate) struct TowerScore {
+    pub kills: usize,
+}
+
+#[derive(Component)]
 pub(crate) struct Shotgun;
 
 #[derive(Component)]
@@ -25,6 +30,7 @@ pub(crate) struct TowerBundle {
     position: Position,
     rotation: Rotation,
     tower: Tower,
+    tower_score: TowerScore,
     health: Health,
     target: Target,
     bullet_filter: BulletFilter,
@@ -43,6 +49,7 @@ impl TowerBundle {
             tower: Tower {
                 health_bar: health_bar(commands),
             },
+            tower_score: TowerScore { kills: 0 },
             health,
             target: Target(None),
             bullet_filter: BulletFilter(false),
