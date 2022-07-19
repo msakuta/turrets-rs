@@ -1,10 +1,16 @@
+mod missile;
+
+use self::missile::{missile_system, missile_trail_system, Missile};
 use crate::{
     sprite_transform_single,
     tower::{MissileTower, Shotgun, Tower, TowerScore},
     BulletFilter, BulletShooter, Explosion, Health, Position, Rotation, Scoreboard, StageClear,
     Target, Textures, Velocity,
 };
+use ::bevy_polyline::prelude::{Polyline, PolylineMaterial};
 use bevy::{prelude::*, sprite::collide_aabb::collide};
+use bevy_polyline::prelude::PolylineBundle;
+use rand::{prelude::StdRng, Rng, SeedableRng};
 
 const ENEMY_SIZE: f32 = 20.;
 const BULLET_SIZE: f32 = 20.;
@@ -21,6 +27,7 @@ impl Plugin for BulletPlugin {
         app.add_system(shoot_bullet);
         app.add_system(bullet_collision);
         app.add_system(missile_system);
+        app.add_system(missile_trail_system);
     }
 }
 
@@ -30,12 +37,11 @@ pub(crate) struct Bullet {
     owner: Entity,
 }
 
-#[derive(Component)]
-pub(crate) struct Missile(Entity);
-
 pub(crate) fn shoot_bullet(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    mut polyline_materials: ResMut<Assets<PolylineMaterial>>,
+    mut polylines: ResMut<Assets<Polyline>>,
     time: Res<Time>,
     mut query: Query<(
         Entity,
@@ -67,6 +73,35 @@ pub(crate) fn shoot_bullet(
                             ),
                     );
                     sprite_transform_single(&position, Some(&bullet_rotation), &mut transform, 0.);
+
+                    let target_line = if let Some(target) = target {
+                        let mut rng = rand::thread_rng();
+                        let target_line = commands
+                            .spawn_bundle(PolylineBundle {
+                                polyline: polylines.add(Polyline {
+                                    vertices: vec![Vec3::new(-1., 0., 1.), Vec3::new(1., 0., 1.)],
+                                    ..Default::default()
+                                }),
+                                material: polyline_materials.add(PolylineMaterial {
+                                    width: 3.0,
+                                    color: Color::hsla(
+                                        rng.gen_range(0.0..360.0),
+                                        1.0,
+                                        rng.gen_range(0.4..0.7),
+                                        0.99,
+                                    ),
+                                    perspective: false,
+                                    ..Default::default()
+                                }),
+                                ..default()
+                            })
+                            .id();
+                        dbg!(target_line);
+                        Some(target_line)
+                    } else {
+                        None
+                    };
+
                     let mut builder = commands.spawn_bundle(SpriteBundle {
                         texture: asset_server.load(file),
                         transform,
@@ -82,8 +117,11 @@ pub(crate) fn shoot_bullet(
                         owner: entity,
                     });
                     builder.insert(StageClear);
-                    if let Some(target) = target {
-                        builder.insert(Missile(target));
+                    if let Some((target, target_line)) = target.zip(target_line) {
+                        builder.insert(Missile {
+                            target,
+                            target_line,
+                        });
                     }
                 };
 
@@ -220,93 +258,5 @@ fn entity_collision(
                 ..default()
             })
             .insert(Explosion(Timer::from_seconds(0.06, true)));
-    }
-}
-
-const MISSILE_ROTATION_SPEED: f32 = std::f32::consts::PI * 0.5;
-
-fn missile_system(
-    time: Res<Time>,
-    mut query: Query<(&mut Missile, &mut Rotation, &Position, &mut Velocity)>,
-    health_query: Query<&Health>,
-    target_query: Query<(Entity, &Position, &BulletFilter)>,
-) {
-    for (mut missile, mut rotation, position, mut velocity) in query.iter_mut() {
-        // Search for target if already have none
-        if health_query
-            .get_component::<Health>(missile.0)
-            .map(|health| health.val <= 0.)
-            .unwrap_or(true)
-        {
-            if let Some((_, nearest)) =
-                target_query
-                    .iter()
-                    .fold(None, |acc: Option<(f32, Entity)>, cur| {
-                        let cur_distance = cur.1 .0.distance(position.0);
-                        if acc.map(|acc| cur_distance < acc.0).unwrap_or(true) {
-                            Some((cur_distance, cur.0))
-                        } else {
-                            acc
-                        }
-                    })
-            {
-                missile.0 = nearest;
-            }
-        }
-
-        // Guide toward target
-        if health_query
-            .get_component::<Health>(missile.0)
-            .map(|health| 0. < health.val)
-            .unwrap_or(false)
-        {
-            // (this.target !== null && 0 < this.target.health){
-            let target_position =
-                if let Ok(position) = target_query.get_component::<Position>(missile.0) {
-                    position
-                } else {
-                    continue;
-                };
-            let delta = target_position.0 - position.0;
-            let angle = rapproach(
-                rotation.0 as f32,
-                delta.y.atan2(delta.x),
-                MISSILE_ROTATION_SPEED * time.delta_seconds(),
-            );
-            rotation.0 = angle as f64;
-            velocity.0.x = MISSILE_SPEED * angle.cos();
-            velocity.0.y = MISSILE_SPEED * angle.sin();
-        }
-    }
-}
-
-/// Rotation approach
-fn rapproach(src: f32, dst: f32, delta: f32) -> f32 {
-    return approach(
-        src + std::f32::consts::PI,
-        dst + std::f32::consts::PI,
-        delta,
-        std::f32::consts::PI * 2.,
-    ) - std::f32::consts::PI;
-}
-
-/// Approach src to dst by delta, optionally wrapping around wrap
-fn approach(src: f32, dst: f32, delta: f32, wrap: f32) -> f32 {
-    if src < dst {
-        if dst - src < delta {
-            return dst;
-        } else if wrap != 0. && wrap / 2. < dst - src {
-            let ret = src - delta - ((src - delta) / wrap).floor() * wrap/*fmod(src - delta + wrap, wrap)*/;
-            return if src < ret && ret < dst { dst } else { ret };
-        }
-        return src + delta;
-    } else {
-        if src - dst < delta {
-            return dst;
-        } else if wrap != 0. && wrap / 2. < src - dst {
-            let ret = src + delta - ((src + delta) / wrap).floor() * wrap/*fmod(src + delta, wrap)*/;
-            return if ret < src && dst < ret { dst } else { ret };
-        }
-        return src - delta;
     }
 }

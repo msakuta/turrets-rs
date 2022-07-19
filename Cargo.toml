@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 bevy = "0.7"
 rand = "0.8.5"
+bevy_polyline = "0.2"

@@ -523,6 +523,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_polyline"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aff83a9ef2b8dee22c2c214e41c6b441ffebf9c6226b35f6e07cdeb4ab158eb5"
+dependencies = [
+ "bevy",
+ "bitflags",
+ "naga",
+]
+
+[[package]]
 name = "bevy_reflect"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2903,6 +2914,7 @@ name = "turrets-rs"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_polyline",
  "rand",
 ]
 

@@ -11,12 +11,14 @@ use crate::{
     tower::{update_health_bar, Timeout, TowerPlugin},
     ui::UIPlugin,
 };
+use ::bevy_polyline::PolylinePlugin;
 use bevy::prelude::*;
 
 fn main() {
     App::new()
         .insert_resource(ClearColor(Color::rgb(0.1, 0.1, 0.2)))
         .add_plugins(DefaultPlugins)
+        .add_plugin(PolylinePlugin)
         .add_plugin(UIPlugin)
         .add_plugin(TowerPlugin)
         .add_plugin(BulletPlugin)
@@ -129,7 +131,11 @@ fn setup(
     });
     commands.insert_resource(Scoreboard { score: 0. });
     commands.insert_resource(Level::Select);
-    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    // commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    commands.spawn_bundle(PerspectiveCameraBundle {
+        transform: Transform::from_xyz(0.0, 0.0, 500.0).looking_at(Vec3::ZERO, Vec3::Y),
+        ..PerspectiveCameraBundle::new_3d()
+    });
 
     commands.spawn_bundle(UiCameraBundle::default());
 
