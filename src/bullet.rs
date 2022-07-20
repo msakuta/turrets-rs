@@ -219,7 +219,8 @@ fn entity_collision(
                 transform: bullet_transform.clone().with_scale(Vec3::splat(3.0)),
                 ..default()
             })
-            .insert(Explosion(Timer::from_seconds(0.06, true)));
+            .insert(Explosion(Timer::from_seconds(0.06, true)))
+            .insert(StageClear);
     }
 }
 

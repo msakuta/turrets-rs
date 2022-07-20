@@ -3,15 +3,15 @@ use bevy::prelude::*;
 use crate::{
     mouse::SelectedTower,
     tower::{spawn_towers, TowerScore},
-    Health, Level, Scoreboard, StageClear,
+    ClearEvent, Health, Level, Scoreboard, StageClear,
 };
 
 pub(crate) struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(StartEvent(false, 0));
-        app.insert_resource(QuitEvent(false));
+        app.add_event::<StartEvent>();
+        app.add_event::<QuitEvent>();
         app.add_startup_system(build_ui);
         app.add_system(update_progress_bar);
         app.add_system(update_level);
@@ -408,15 +408,15 @@ fn update_tower_health(
     }
 }
 
-struct StartEvent(bool, usize);
-struct QuitEvent(bool);
+struct StartEvent(usize);
+struct QuitEvent;
 
 fn quit_button_system(
     mut interaction_query: Query<
         (&Interaction, &mut UiColor),
         (Changed<Interaction>, With<Button>, With<QuitButtonFilter>),
     >,
-    mut event: ResMut<QuitEvent>,
+    mut writer: EventWriter<QuitEvent>,
     level: Res<Level>,
 ) {
     if let Level::Select = level.as_ref() {
@@ -425,7 +425,7 @@ fn quit_button_system(
     for (interaction, mut color) in interaction_query.iter_mut() {
         match *interaction {
             Interaction::Clicked => {
-                event.0 = true;
+                writer.send(QuitEvent);
             }
             Interaction::Hovered => {
                 *color = HOVERED_BUTTON.into();
@@ -438,34 +438,36 @@ fn quit_button_system(
 }
 
 fn quit_event_system(
-    mut event: ResMut<QuitEvent>,
     mut commands: Commands,
     query: Query<Entity, With<StageClear>>,
     mut level: ResMut<Level>,
+    mut reader: EventReader<QuitEvent>,
+    mut writer: EventWriter<ClearEvent>,
 ) {
-    if event.0 {
-        event.0 = false;
+    if reader.iter().last().is_some() {
+        println!("Received QuitEvent");
         for entity in query.iter() {
             commands.entity(entity).despawn();
         }
         *level = Level::Select;
+        writer.send(ClearEvent);
     }
 }
 
 fn difficulty_event_system(
-    mut event: ResMut<StartEvent>,
+    mut reader: EventReader<StartEvent>,
     mut commands: Commands,
     query: Query<Entity, With<StageClear>>,
     mut level: ResMut<Level>,
     mut scoreboard: ResMut<Scoreboard>,
     asset_server: Res<AssetServer>,
 ) {
-    if event.0 {
-        event.0 = false;
+    // We only care about the last event if multiple StartEvents have issued
+    if let Some(event) = reader.iter().last() {
         for entity in query.iter() {
             commands.entity(entity).despawn();
         }
-        *level = Level::start(event.1);
+        *level = Level::start(event.0);
         scoreboard.score = 0.;
         spawn_towers(&mut commands, &asset_server);
     }
@@ -476,15 +478,14 @@ fn difficulty_button_system(
         (&Interaction, &mut UiColor, &DifficultyButton),
         (Changed<Interaction>, With<Button>),
     >,
-    mut event: ResMut<StartEvent>,
+    mut writer: EventWriter<StartEvent>,
     level: Res<Level>,
 ) {
     if let Level::Select = level.as_ref() {
         for (interaction, mut color, difficulty) in interaction_query.iter_mut() {
             match *interaction {
                 Interaction::Clicked => {
-                    event.0 = true;
-                    event.1 = difficulty.difficulty;
+                    writer.send(StartEvent(difficulty.difficulty));
                 }
                 Interaction::Hovered => {
                     *color = HOVERED_BUTTON.into();

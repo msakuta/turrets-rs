@@ -15,6 +15,7 @@ use bevy::prelude::*;
 
 fn main() {
     App::new()
+        .add_event::<ClearEvent>()
         .insert_resource(ClearColor(Color::rgb(0.1, 0.1, 0.2)))
         .add_plugins(DefaultPlugins)
         .add_plugin(UIPlugin)
@@ -142,12 +143,18 @@ fn time_level(mut level: ResMut<Level>, time: Res<Time>) {
     }
 }
 
+struct ClearEvent;
+
 fn erase_entities_new_game<T: Component>(
     mut commands: Commands,
-    level: Res<Level>,
+    mut reader: EventReader<ClearEvent>,
     query: Query<Entity, With<T>>,
 ) {
-    if level.timer_finished() {
+    // We don't care how many events occurred. We only care if it was 0 or more than 0.
+    let had_clear_event = reader.iter().last().is_some();
+
+    if had_clear_event {
+        println!("Clear event read for {:?}", std::any::type_name::<T>());
         for entity in query.iter() {
             commands.entity(entity).despawn();
         }
