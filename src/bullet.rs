@@ -89,14 +89,8 @@ pub(crate) fn shoot_bullet(
                         owner: entity,
                     });
                     builder.insert(StageClear);
-                    let mut trail_nodes = VecDeque::new();
-                    trail_nodes.push_back(position.0);
                     if let Some((target, trail)) = target.zip(trail) {
-                        builder.insert(Missile {
-                            target,
-                            trail,
-                            trail_nodes,
-                        });
+                        builder.insert(Missile::new(target, trail, &position));
                     }
                 };
 

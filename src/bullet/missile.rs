@@ -3,24 +3,55 @@ use bevy::prelude::*;
 use bevy_prototype_lyon::prelude::*;
 use std::collections::VecDeque;
 
+const MAX_TIME_TO_LIVE: f32 = 10.;
+const MISSILE_ROTATION_SPEED: f32 = std::f32::consts::PI * 0.5;
+pub(super) const MISSILE_SPEED: f32 = 300.;
+
 #[derive(Component)]
 pub(crate) struct Missile {
+    pub(super) time_to_live: f32,
     pub(super) target: Entity,
     pub(super) trail: Entity,
     pub(super) trail_nodes: VecDeque<Vec2>,
 }
 
-const MISSILE_ROTATION_SPEED: f32 = std::f32::consts::PI * 0.5;
-pub(super) const MISSILE_SPEED: f32 = 300.;
+impl Missile {
+    pub(super) fn new(target: Entity, trail: Entity, position: &Position) -> Self {
+        let mut trail_nodes = VecDeque::new();
+        trail_nodes.push_back(position.0);
+        Self {
+            time_to_live: MAX_TIME_TO_LIVE,
+            target,
+            trail,
+            trail_nodes,
+        }
+    }
+}
 
 pub(super) fn missile_system(
+    mut commands: Commands,
     time: Res<Time>,
-    mut query: Query<(&mut Missile, &mut Rotation, &Position, &mut Velocity)>,
+    mut query: Query<(
+        Entity,
+        &mut Missile,
+        &mut Rotation,
+        &Position,
+        &mut Velocity,
+    )>,
     health_query: Query<&Health>,
     target_query: Query<(Entity, &Position, &BulletFilter)>,
     mut trail_query: Query<&mut Path>,
 ) {
-    for (mut missile, mut rotation, position, mut velocity) in query.iter_mut() {
+    let delta_time = time.delta_seconds();
+    for (entity, mut missile, mut rotation, position, mut velocity) in query.iter_mut() {
+        // Delete expired missiles (and don't forget the trail)
+        missile.time_to_live -= delta_time;
+        if missile.time_to_live < 0. {
+            commands.entity(entity).despawn();
+            commands.entity(missile.trail).despawn();
+            continue;
+        }
+
         // Search for target if already have none
         if health_query
             .get_component::<Health>(missile.target)
