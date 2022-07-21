@@ -5,7 +5,7 @@ mod tower;
 mod ui;
 
 use crate::{
-    bullet::{Bullet, BulletPlugin},
+    bullet::{Bullet, BulletPlugin, Missile},
     enemy::{enemy_system, spawn_enemies, Enemy},
     mouse::MousePlugin,
     tower::{update_health_bar, Timeout, TowerPlugin},
@@ -33,7 +33,6 @@ fn main() {
         .add_system(sprite_transform)
         .add_system(animate_sprite)
         .add_system(update_health_bar)
-        .add_system(cleanup::<Bullet>)
         .run();
 }
 
@@ -226,29 +225,6 @@ fn animate_sprite(
             } else {
                 sprite.index = (sprite.index + 1) % texture_atlas.textures.len();
             }
-        }
-    }
-}
-
-fn cleanup<T: Component>(
-    mut commands: Commands,
-    windows: Res<Windows>,
-    query: Query<(Entity, &Position, &T)>,
-) {
-    let window = if let Some(window) = windows.iter().next() {
-        window
-    } else {
-        return;
-    };
-    let (width, height) = (window.width(), window.height());
-    for (entity, position, _) in query.iter() {
-        if position.0.x < -width / 2.
-            || width / 2. < position.0.x
-            || position.0.y < -height / 2.
-            || height / 2. < position.0.y
-        {
-            commands.entity(entity).despawn();
-            // println!("Despawned {entity:?} ({})", std::any::type_name::<T>());
         }
     }
 }

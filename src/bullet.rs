@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::{
     sprite_transform_single,
     tower::{MissileTower, Shotgun, Tower, TowerScore},
@@ -5,6 +7,7 @@ use crate::{
     Target, Textures, Velocity,
 };
 use bevy::{prelude::*, sprite::collide_aabb::collide};
+use bevy_prototype_lyon::prelude::*;
 
 const ENEMY_SIZE: f32 = 20.;
 const BULLET_SIZE: f32 = 20.;
@@ -18,9 +21,11 @@ pub(crate) struct BulletPlugin;
 
 impl Plugin for BulletPlugin {
     fn build(&self, app: &mut App) {
+        app.add_plugin(ShapePlugin);
         app.add_system(shoot_bullet);
         app.add_system(bullet_collision);
         app.add_system(missile_system);
+        app.add_system(cleanup::<Bullet>);
     }
 }
 
@@ -31,7 +36,11 @@ pub(crate) struct Bullet {
 }
 
 #[derive(Component)]
-pub(crate) struct Missile(Entity);
+pub(crate) struct Missile {
+    target: Entity,
+    trail: Entity,
+    trail_nodes: VecDeque<Vec2>,
+}
 
 pub(crate) fn shoot_bullet(
     mut commands: Commands,
@@ -46,6 +55,7 @@ pub(crate) fn shoot_bullet(
         Option<&MissileTower>,
         Option<&Target>,
     )>,
+    target_query: Query<&Position>,
 ) {
     let delta = time.delta_seconds();
     for (entity, position, rotation, mut bullet_shooter, shotgun, missile_tower, target) in
@@ -66,6 +76,28 @@ pub(crate) fn shoot_bullet(
                                 -angle.cos() as f32 * horz_offset,
                             ),
                     );
+
+                    let trail = target
+                        .and_then(|target| target_query.get_component::<Position>(target).ok())
+                        .map(|target_position| {
+                            // Build empty path, which we will replace later
+                            let mut path_builder = PathBuilder::new();
+                            path_builder.move_to(position.0);
+                            let line = path_builder.build();
+
+                            commands
+                                .spawn_bundle(GeometryBuilder::build_as(
+                                    &line,
+                                    DrawMode::Stroke(StrokeMode::new(
+                                        Color::rgba(0.8, 0.8, 0.7, 0.5),
+                                        3.0,
+                                    )),
+                                    Transform::default(),
+                                ))
+                                .insert(StageClear)
+                                .id()
+                        });
+
                     sprite_transform_single(&position, Some(&bullet_rotation), &mut transform, 0.);
                     let mut builder = commands.spawn_bundle(SpriteBundle {
                         texture: asset_server.load(file),
@@ -82,8 +114,14 @@ pub(crate) fn shoot_bullet(
                         owner: entity,
                     });
                     builder.insert(StageClear);
-                    if let Some(target) = target {
-                        builder.insert(Missile(target));
+                    let mut trail_nodes = VecDeque::new();
+                    trail_nodes.push_back(position.0);
+                    if let Some((target, trail)) = target.zip(trail) {
+                        builder.insert(Missile {
+                            target,
+                            trail,
+                            trail_nodes,
+                        });
                     }
                 };
 
@@ -140,12 +178,12 @@ pub(crate) fn bullet_collision(
         &BulletFilter,
         Option<&Tower>,
     )>,
-    bullet_query: Query<(Entity, &Transform, &Bullet)>,
+    bullet_query: Query<(Entity, &Transform, &Bullet, Option<&Missile>)>,
     textures: Res<Textures>,
     mut scoreboard: ResMut<Scoreboard>,
     mut scoring_tower: Query<&mut TowerScore>,
 ) {
-    for (bullet_entity, bullet_transform, bullet) in bullet_query.iter() {
+    for (bullet_entity, bullet_transform, bullet, missile) in bullet_query.iter() {
         for (entity, transform, health, bullet_filter, tower) in target_query.iter_mut() {
             if bullet.filter == bullet_filter.0 {
                 entity_collision(
@@ -153,6 +191,7 @@ pub(crate) fn bullet_collision(
                     bullet_entity,
                     bullet,
                     bullet_transform,
+                    missile,
                     entity,
                     transform,
                     tower,
@@ -171,6 +210,7 @@ fn entity_collision(
     bullet_entity: Entity,
     bullet: &Bullet,
     bullet_transform: &Transform,
+    missile: Option<&Missile>,
     entity: Entity,
     transform: &Transform,
     tower: Option<&Tower>,
@@ -188,6 +228,9 @@ fn entity_collision(
 
     if collision.is_some() {
         commands.entity(bullet_entity).despawn();
+        if let Some(missile) = missile {
+            commands.entity(missile.trail).despawn();
+        }
         if health.val < 1. {
             commands.entity(entity).despawn();
             if let Some(tower) = tower {
@@ -231,11 +274,12 @@ fn missile_system(
     mut query: Query<(&mut Missile, &mut Rotation, &Position, &mut Velocity)>,
     health_query: Query<&Health>,
     target_query: Query<(Entity, &Position, &BulletFilter)>,
+    mut trail_query: Query<&mut Path>,
 ) {
     for (mut missile, mut rotation, position, mut velocity) in query.iter_mut() {
         // Search for target if already have none
         if health_query
-            .get_component::<Health>(missile.0)
+            .get_component::<Health>(missile.target)
             .map(|health| health.val <= 0.)
             .unwrap_or(true)
         {
@@ -251,19 +295,19 @@ fn missile_system(
                         }
                     })
             {
-                missile.0 = nearest;
+                missile.target = nearest;
             }
         }
 
         // Guide toward target
         if health_query
-            .get_component::<Health>(missile.0)
+            .get_component::<Health>(missile.target)
             .map(|health| 0. < health.val)
             .unwrap_or(false)
         {
             // (this.target !== null && 0 < this.target.health){
             let target_position =
-                if let Ok(position) = target_query.get_component::<Position>(missile.0) {
+                if let Ok(position) = target_query.get_component::<Position>(missile.target) {
                     position
                 } else {
                     continue;
@@ -277,6 +321,34 @@ fn missile_system(
             rotation.0 = angle as f64;
             velocity.0.x = MISSILE_SPEED * angle.cos();
             velocity.0.y = MISSILE_SPEED * angle.sin();
+        }
+
+        const MAX_NODES: usize = 50;
+        if MAX_NODES < missile.trail_nodes.len() {
+            for _ in 0..(missile.trail_nodes.len() - MAX_NODES) {
+                missile.trail_nodes.pop_front();
+            }
+        }
+
+        if missile
+            .trail_nodes
+            .back()
+            .map(|back| 10. < back.distance(position.0))
+            .unwrap_or(false)
+        {
+            missile.trail_nodes.push_back(position.0);
+        }
+
+        if let Ok(mut trail) = trail_query.get_component_mut::<Path>(missile.trail) {
+            let mut iter = missile.trail_nodes.iter();
+            if let Some(first) = iter.next() {
+                let mut trail_builder = PathBuilder::new();
+                trail_builder.move_to(*first);
+                for node in iter {
+                    trail_builder.line_to(*node);
+                }
+                *trail = trail_builder.build();
+            }
         }
     }
 }
@@ -309,5 +381,31 @@ fn approach(src: f32, dst: f32, delta: f32, wrap: f32) -> f32 {
             return if ret < src && dst < ret { dst } else { ret };
         }
         return src - delta;
+    }
+}
+
+fn cleanup<T: Component>(
+    mut commands: Commands,
+    windows: Res<Windows>,
+    query: Query<(Entity, &Position, Option<&Missile>), With<T>>,
+) {
+    let window = if let Some(window) = windows.iter().next() {
+        window
+    } else {
+        return;
+    };
+    let (width, height) = (window.width(), window.height());
+    for (entity, position, missile) in query.iter() {
+        if position.0.x < -width / 2.
+            || width / 2. < position.0.x
+            || position.0.y < -height / 2.
+            || height / 2. < position.0.y
+        {
+            commands.entity(entity).despawn();
+            if let Some(missile) = missile {
+                commands.entity(missile.trail).despawn();
+            }
+            // println!("Despawned {entity:?} ({})", std::any::type_name::<T>());
+        }
     }
 }
