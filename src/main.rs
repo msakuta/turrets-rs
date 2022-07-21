@@ -5,7 +5,7 @@ mod tower;
 mod ui;
 
 use crate::{
-    bullet::{Bullet, BulletPlugin, Missile},
+    bullet::{Bullet, BulletPlugin},
     enemy::{enemy_system, spawn_enemies, Enemy},
     mouse::MousePlugin,
     tower::{update_health_bar, Timeout, TowerPlugin},
