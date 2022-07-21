@@ -26,7 +26,7 @@ impl Plugin for BulletPlugin {
         app.add_system(shoot_bullet);
         app.add_system(bullet_collision);
         app.add_system(missile_system);
-        app.add_system(cleanup::<Bullet>);
+        app.add_system(cleanup);
     }
 }
 
@@ -238,10 +238,10 @@ fn entity_collision(
     }
 }
 
-fn cleanup<T: Component>(
+fn cleanup(
     mut commands: Commands,
     windows: Res<Windows>,
-    query: Query<(Entity, &Position, Option<&Missile>), With<T>>,
+    query: Query<(Entity, &Position, Option<&Missile>), (With<Bullet>, Without<Missile>)>,
 ) {
     let window = if let Some(window) = windows.iter().next() {
         window
