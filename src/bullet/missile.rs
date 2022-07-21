@@ -1,5 +1,5 @@
 use crate::{BulletFilter, Health, Position, Rotation, StageClear, Velocity};
-use bevy::prelude::*;
+use bevy::{ecs::system::QueryComponentError, prelude::*};
 use bevy_prototype_lyon::prelude::*;
 use std::collections::VecDeque;
 
@@ -52,50 +52,22 @@ pub(super) fn missile_system(
             continue;
         }
 
-        // Search for target if already have none
-        if health_query
-            .get_component::<Health>(missile.target)
-            .map(|health| health.val <= 0.)
-            .unwrap_or(true)
-        {
-            if let Some((_, nearest)) =
-                target_query
-                    .iter()
-                    .fold(None, |acc: Option<(f32, Entity)>, cur| {
-                        let cur_distance = cur.1 .0.distance(position.0);
-                        if acc.map(|acc| cur_distance < acc.0).unwrap_or(true) {
-                            Some((cur_distance, cur.0))
-                        } else {
-                            acc
-                        }
-                    })
-            {
-                missile.target = nearest;
-            }
-        }
+        if MAX_TIME_TO_LIVE - 1. < missile.time_to_live {
+            search_target(&mut missile, &position, &health_query, &target_query);
 
-        // Guide toward target
-        if health_query
-            .get_component::<Health>(missile.target)
-            .map(|health| 0. < health.val)
-            .unwrap_or(false)
-        {
-            // (this.target !== null && 0 < this.target.health){
-            let target_position =
-                if let Ok(position) = target_query.get_component::<Position>(missile.target) {
-                    position
-                } else {
-                    continue;
-                };
-            let delta = target_position.0 - position.0;
-            let angle = rapproach(
-                rotation.0 as f32,
-                delta.y.atan2(delta.x),
-                MISSILE_ROTATION_SPEED * time.delta_seconds(),
-            );
-            rotation.0 = angle as f64;
-            velocity.0.x = MISSILE_SPEED * angle.cos();
-            velocity.0.y = MISSILE_SPEED * angle.sin();
+            if guide_to_target(
+                &mut missile,
+                delta_time,
+                &position,
+                &mut velocity,
+                &mut rotation,
+                &health_query,
+                &target_query,
+            )
+            .is_err()
+            {
+                continue;
+            }
         }
 
         const MAX_NODES: usize = 50;
@@ -126,6 +98,63 @@ pub(super) fn missile_system(
             }
         }
     }
+}
+
+fn search_target(
+    missile: &mut Missile,
+    position: &Position,
+    health_query: &Query<&Health>,
+    target_query: &Query<(Entity, &Position, &BulletFilter)>,
+) {
+    // Search for target if already have none
+    if health_query
+        .get_component::<Health>(missile.target)
+        .map(|health| health.val <= 0.)
+        .unwrap_or(true)
+    {
+        if let Some((_, nearest)) =
+            target_query
+                .iter()
+                .fold(None, |acc: Option<(f32, Entity)>, cur| {
+                    let cur_distance = cur.1 .0.distance(position.0);
+                    if acc.map(|acc| cur_distance < acc.0).unwrap_or(true) {
+                        Some((cur_distance, cur.0))
+                    } else {
+                        acc
+                    }
+                })
+        {
+            missile.target = nearest;
+        }
+    }
+}
+
+fn guide_to_target(
+    missile: &mut Missile,
+    delta_seconds: f32,
+    position: &Position,
+    velocity: &mut Velocity,
+    rotation: &mut Rotation,
+    health_query: &Query<&Health>,
+    target_query: &Query<(Entity, &Position, &BulletFilter)>,
+) -> Result<(), QueryComponentError> {
+    if health_query
+        .get_component::<Health>(missile.target)
+        .map(|health| 0. < health.val)
+        .unwrap_or(false)
+    {
+        let target_position = target_query.get_component::<Position>(missile.target)?;
+        let delta = target_position.0 - position.0;
+        let angle = rapproach(
+            rotation.0 as f32,
+            delta.y.atan2(delta.x),
+            MISSILE_ROTATION_SPEED * delta_seconds,
+        );
+        rotation.0 = angle as f64;
+        velocity.0.x = MISSILE_SPEED * angle.cos();
+        velocity.0.y = MISSILE_SPEED * angle.sin();
+    }
+    Ok(())
 }
 
 pub(super) fn gen_trail(commands: &mut Commands, position: &Position) -> Entity {

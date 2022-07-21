@@ -1,7 +1,5 @@
 mod missile;
 
-use std::collections::VecDeque;
-
 use self::missile::{missile_system, Missile, MISSILE_SPEED};
 use crate::{
     sprite_transform_single,
@@ -17,6 +15,7 @@ const BULLET_SIZE: f32 = 20.;
 
 pub(crate) const SHOOT_INTERVAL: f32 = 0.5;
 const SHOTGUN_SHOOT_INTERVAL: f32 = 1.5;
+const MISSILE_SHOOT_INTERVAL: f32 = 2.5;
 const BULLET_SPEED: f32 = 500.;
 
 pub(crate) struct BulletPlugin;
@@ -108,16 +107,19 @@ pub(crate) fn shoot_bullet(
                     bullet_shooter.1 += SHOTGUN_SHOOT_INTERVAL;
                 } else if missile_tower.is_some() {
                     if let Some(target) = target.and_then(|target| target.0) {
-                        for i in 0..2 {
+                        for i in -2..=2 {
+                            if i == 0 {
+                                continue;
+                            }
                             shoot(
                                 "missile.png",
-                                rotation.0,
+                                rotation.0 - i as f64 * std::f64::consts::PI * 0.05,
                                 MISSILE_SPEED,
-                                i as f32 * 20. - 10.,
+                                i as f32 * 20.,
                                 Some(target),
                             );
                         }
-                        bullet_shooter.1 += SHOTGUN_SHOOT_INTERVAL;
+                        bullet_shooter.1 += MISSILE_SHOOT_INTERVAL;
                     }
                 } else {
                     shoot("bullet.png", rotation.0, BULLET_SPEED, 0., None);
