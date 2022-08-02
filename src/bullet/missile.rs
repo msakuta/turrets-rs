@@ -167,7 +167,7 @@ pub(super) fn gen_trail(commands: &mut Commands, position: &Position) -> Entity 
         .spawn_bundle(GeometryBuilder::build_as(
             &line,
             DrawMode::Stroke(StrokeMode::new(Color::rgba(0.8, 0.8, 0.7, 0.5), 3.0)),
-            Transform::default(),
+            Transform::from_xyz(0., 0., 0.05),
         ))
         .insert(StageClear)
         .id()

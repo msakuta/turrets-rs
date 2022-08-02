@@ -133,6 +133,12 @@ fn setup(
 
     commands.spawn_bundle(UiCameraBundle::default());
 
+    commands.spawn_bundle(SpriteBundle {
+        texture: asset_server.load("cliff-crop.png"),
+        transform: Transform::from_scale(Vec3::ONE * 2.),
+        ..default()
+    });
+
     // spawn_towers(&mut commands, &asset_server);
 }
 
@@ -186,7 +192,7 @@ fn sprite_transform(
             position,
             rotation,
             transform.as_mut(),
-            if timeout.is_some() { 0.1 } else { 0. },
+            if timeout.is_some() { 0.1 } else { 0.05 },
         );
     }
 }

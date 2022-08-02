@@ -46,6 +46,12 @@ In that case,
 * use whatever your favourite web server application that can host from your
 local filesystem.
 
+## Image credit
+
+Background image obtained and modified from [NASA and STScI, James Webb Space Telescope](https://webbtelescope.org/contents/media/images/2022/034/01G7DA5ADA2WDSK1JJPQ0PTG4A),
+according to the [public domain use policy](https://webbtelescope.org/copyright).
+
+![img](assets/cliff-crop.png)
 
 ## My impression on Bevy Wasm build target
 

@@ -64,7 +64,7 @@ fn mouse_system(
                 .and_then(|tower| query_towers.get_component_mut::<Position>(tower).ok())
             {
                 tower.0 = mouse_screen;
-                *cursor_transform = Transform::from_xyz(mouse_screen.x, mouse_screen.y, 0.)
+                *cursor_transform = Transform::from_xyz(mouse_screen.x, mouse_screen.y, 0.2)
                     .with_scale(Vec3::new(2., 2., 1.));
             }
         } else {
@@ -73,7 +73,7 @@ fn mouse_system(
                 if tower_position.0.distance(mouse_screen) < 30. {
                     visibility.is_visible = true;
                     *cursor_transform =
-                        Transform::from_xyz(tower_position.0.x, tower_position.0.y, 0.)
+                        Transform::from_xyz(tower_position.0.x, tower_position.0.y, 0.2)
                             .with_scale(Vec3::new(2., 2., 1.));
 
                     selected_tower.tower = Some(entity);
