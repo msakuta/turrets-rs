@@ -48,7 +48,7 @@ local filesystem.
 
 ## Image credit
 
-Background image obtained and modified from [NASA and STScI, James Webb Space Telescope](https://webbtelescope.org/contents/media/images/2022/034/01G7DA5ADA2WDSK1JJPQ0PTG4A),
+Background image obtained and modified from [NASA and STScI, James Webb Space Telescope](https://webbtelescope.org/contents/media/images/2022/031/01G77PKB8NKR7S8Z6HBXMYATGJ),
 according to the [public domain use policy](https://webbtelescope.org/copyright).
 
 ![img](assets/cliff-crop.png)
