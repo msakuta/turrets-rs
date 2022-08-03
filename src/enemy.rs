@@ -1,6 +1,6 @@
 use crate::{
-    bullet::SHOOT_INTERVAL, BulletFilter, BulletShooter, Health, Level, Position, StageClear,
-    Velocity,
+    bullet::SHOOT_INTERVAL, mouse::SelectedTower, BulletFilter, BulletShooter, Health, Level,
+    Position, StageClear, Velocity,
 };
 use bevy::prelude::*;
 
@@ -16,7 +16,11 @@ pub(crate) fn spawn_enemies(
     windows: Res<Windows>,
     time: Res<Time>,
     level: Res<Level>,
+    selected_tower: Res<SelectedTower>,
 ) {
+    if selected_tower.dragging {
+        return;
+    }
     let enemy_count = query.iter().count();
     if MAX_ENEMIES <= enemy_count {
         return;

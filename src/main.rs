@@ -7,7 +7,7 @@ mod ui;
 use crate::{
     bullet::{Bullet, BulletPlugin},
     enemy::{enemy_system, spawn_enemies, Enemy},
-    mouse::MousePlugin,
+    mouse::{MousePlugin, SelectedTower},
     tower::{update_health_bar, Timeout, TowerPlugin},
     ui::UIPlugin,
 };
@@ -142,7 +142,10 @@ fn setup(
     // spawn_towers(&mut commands, &asset_server);
 }
 
-fn time_level(mut level: ResMut<Level>, time: Res<Time>) {
+fn time_level(mut level: ResMut<Level>, time: Res<Time>, selected_tower: Res<SelectedTower>) {
+    if selected_tower.dragging {
+        return;
+    }
     if let Level::Running { timer, .. } = level.as_mut() {
         timer.tick(time.delta());
     }
@@ -173,9 +176,15 @@ fn reset_game(mut level: ResMut<Level>) {
     }
 }
 
-fn linear_motion(time: Res<Time>, mut query: Query<(&mut Position, &Velocity)>) {
-    for (mut position, velocity) in query.iter_mut() {
-        position.0 += velocity.0 * time.delta_seconds();
+fn linear_motion(
+    time: Res<Time>,
+    mut query: Query<(&mut Position, &Velocity)>,
+    selected_tower: Res<SelectedTower>,
+) {
+    if !selected_tower.dragging {
+        for (mut position, velocity) in query.iter_mut() {
+            position.0 += velocity.0 * time.delta_seconds();
+        }
     }
 }
 
@@ -221,7 +230,11 @@ fn animate_sprite(
         &mut TextureAtlasSprite,
         &Handle<TextureAtlas>,
     )>,
+    selected_tower: Res<SelectedTower>,
 ) {
+    if selected_tower.dragging {
+        return;
+    }
     for (entity, mut timer, mut sprite, texture_atlas_handle) in query.iter_mut() {
         timer.tick(time.delta());
         if timer.just_finished() {

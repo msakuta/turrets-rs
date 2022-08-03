@@ -79,7 +79,6 @@ fn mouse_system(
                     selected_tower.tower = Some(entity);
 
                     if btn.just_pressed(MouseButton::Left) {
-                        println!("Just_pressed! {:?} -> {:?}", mouse_position, mouse_screen);
                         selected_tower.dragging = true;
                     }
                     return;

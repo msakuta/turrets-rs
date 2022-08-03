@@ -2,6 +2,7 @@ mod missile;
 
 use self::missile::{missile_system, Missile, MISSILE_SPEED};
 use crate::{
+    mouse::SelectedTower,
     sprite_transform_single,
     tower::{MissileTower, Shotgun, Tower, TowerScore},
     BulletFilter, BulletShooter, Explosion, Health, Position, Rotation, Scoreboard, StageClear,
@@ -49,7 +50,12 @@ pub(crate) fn shoot_bullet(
         Option<&MissileTower>,
         Option<&Target>,
     )>,
+    selected_tower: Res<SelectedTower>,
 ) {
+    if selected_tower.dragging {
+        return;
+    }
+
     let delta = time.delta_seconds();
     for (entity, position, rotation, mut bullet_shooter, shotgun, missile_tower, target) in
         query.iter_mut()
@@ -153,7 +159,11 @@ pub(crate) fn bullet_collision(
     textures: Res<Textures>,
     mut scoreboard: ResMut<Scoreboard>,
     mut scoring_tower: Query<&mut TowerScore>,
+    selected_tower: Res<SelectedTower>,
 ) {
+    if selected_tower.dragging {
+        return;
+    }
     for (bullet_entity, bullet_transform, bullet, missile) in bullet_query.iter() {
         for (entity, transform, health, bullet_filter, tower) in target_query.iter_mut() {
             if bullet.filter == bullet_filter.0 {
