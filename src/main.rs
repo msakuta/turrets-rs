@@ -81,6 +81,16 @@ struct Textures {
 
 struct Scoreboard {
     score: f64,
+    credits: f64,
+}
+
+impl Default for Scoreboard {
+    fn default() -> Self {
+        Self {
+            score: 0.,
+            credits: 0.,
+        }
+    }
 }
 
 enum Level {
@@ -127,7 +137,7 @@ fn setup(
         small_explosion: gen_texture_handle("explode.png", 16., 8),
         large_explosion: gen_texture_handle("explode2.png", 32., 6),
     });
-    commands.insert_resource(Scoreboard { score: 0. });
+    commands.insert_resource(Scoreboard::default());
     commands.insert_resource(Level::Select);
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 

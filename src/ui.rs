@@ -24,6 +24,7 @@ impl Plugin for UIPlugin {
         app.add_system(update_progress_bar);
         app.add_system(update_level);
         app.add_system(update_scoreboard);
+        app.add_system(update_credits);
         app.add_system(update_tower_scoreboard);
         app.add_system(update_tower_health);
         app.add_system(palette_mouse_system);
@@ -47,6 +48,9 @@ struct LevelText;
 
 #[derive(Component)]
 struct ScoreText;
+
+#[derive(Component)]
+struct CreditsText;
 
 #[derive(Component)]
 struct TowerHealthText;
@@ -161,6 +165,42 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                     ..default()
                 })
                 .insert(ScoreText);
+
+            parent
+                .spawn_bundle(TextBundle {
+                    text: Text {
+                        sections: vec![
+                            TextSection {
+                                value: "Credit: ".to_string(),
+                                style: TextStyle {
+                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                                    font_size: SCOREBOARD_FONT_SIZE,
+                                    color: TEXT_COLOR,
+                                },
+                            },
+                            TextSection {
+                                value: "".to_string(),
+                                style: TextStyle {
+                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                                    font_size: SCOREBOARD_FONT_SIZE,
+                                    color: SCORE_COLOR,
+                                },
+                            },
+                        ],
+                        ..default()
+                    },
+                    // style: Style {
+                    //     position_type: PositionType::Absolute,
+                    //     position: Rect {
+                    //         top: PADDING_PX,
+                    //         left: PADDING_PX,
+                    //         ..default()
+                    //     },
+                    //     ..default()
+                    // },
+                    ..default()
+                })
+                .insert(CreditsText);
         });
 
     commands
@@ -297,6 +337,12 @@ fn update_level(level: Res<Level>, mut query: Query<&mut Text, With<LevelText>>)
 fn update_scoreboard(scoreboard: Res<Scoreboard>, mut query: Query<&mut Text, With<ScoreText>>) {
     if let Ok(mut text) = query.get_single_mut() {
         text.sections[1].value = format!("{}", scoreboard.score);
+    }
+}
+
+fn update_credits(scoreboard: Res<Scoreboard>, mut query: Query<&mut Text, With<CreditsText>>) {
+    if let Ok(mut text) = query.get_single_mut() {
+        text.sections[1].value = format!("${}", scoreboard.credits);
     }
 }
 
