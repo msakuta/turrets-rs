@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::{
     mouse::{MouseCursor, SelectedTower},
     tower::{spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_turret},
-    Level,
+    Level, Scoreboard,
 };
 
 use super::{BUTTON_HEIGHT, PADDING, PADDING_PX, PALETTE_SIZE};
@@ -28,6 +28,16 @@ impl TowerPalette {
             Self::Shotgun => spawn_shotgun(commands, asset_server, position, 0.),
             Self::Healer => spawn_healer(commands, asset_server, position, 0.),
             Self::MissileTower => spawn_missile_tower(commands, asset_server, position, 0.),
+        }
+    }
+
+    fn cost(&self) -> f64 {
+        // TODO: Scale with the number of existing towers
+        match self {
+            Self::Turret => 100.,
+            Self::Shotgun => 150.,
+            Self::Healer => 200.,
+            Self::MissileTower => 350.,
         }
     }
 }
@@ -103,6 +113,7 @@ pub(super) fn palette_mouse_system(
     asset_server: Res<AssetServer>,
     windows: Res<Windows>,
     level: Res<Level>,
+    mut scoreboard: ResMut<Scoreboard>,
     mut query: Query<(&mut Transform, &mut Visibility), With<MouseCursor>>,
     query_towers: Query<(&Interaction, &Parent, &TowerPalette), Changed<Interaction>>,
     mut query_ui_color: Query<&mut UiColor>,
@@ -134,6 +145,12 @@ pub(super) fn palette_mouse_system(
                 match *interaction {
                     Interaction::Clicked => {
                         println!("Clicked tower palette at {mouse_screen:?}");
+
+                        let cost = palette.cost();
+                        if scoreboard.credits < cost {
+                            return;
+                        }
+
                         *ui_color = Color::rgba(1., 0., 1., 0.75).into();
 
                         visibility.is_visible = true;
@@ -144,6 +161,8 @@ pub(super) fn palette_mouse_system(
                         let tower = palette.spawn(&mut commands, &asset_server, mouse_screen);
                         selected_tower.tower = Some(tower);
                         selected_tower.dragging = true;
+
+                        scoreboard.credits -= cost;
 
                         return;
                     }

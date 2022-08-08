@@ -227,6 +227,7 @@ fn entity_collision(
                 .insert(Explosion(Timer::from_seconds(0.15, true)))
                 .insert(StageClear);
             scoreboard.score += 10.;
+            scoreboard.credits += 10.;
 
             if let Ok(mut scoring_tower) =
                 scoring_tower.get_component_mut::<TowerScore>(bullet.owner)
