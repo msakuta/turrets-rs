@@ -2,6 +2,7 @@ mod difficulty_select;
 mod quit;
 mod scoreboard;
 mod tower_palette;
+mod tower_status;
 
 use bevy::prelude::*;
 
@@ -13,8 +14,9 @@ use self::{
     quit::{add_quit_button, quit_button_system, quit_event_system, show_quit_button_system},
     scoreboard::{add_scoreboard, update_credits, update_level, update_scoreboard},
     tower_palette::{add_palette_buttons, palette_mouse_system},
+    tower_status::{add_status_panel, update_tower_health, update_tower_scoreboard},
 };
-use crate::{mouse::SelectedTower, tower::TowerScore, Health, Level};
+use crate::Level;
 
 pub(crate) struct UIPlugin;
 
@@ -41,12 +43,6 @@ impl Plugin for UIPlugin {
 
 struct StartEvent(usize);
 struct QuitEvent;
-
-#[derive(Component)]
-struct TowerHealthText;
-
-#[derive(Component)]
-struct TowerScoreText;
 
 #[derive(Component)]
 struct ProgressBar;
@@ -101,81 +97,6 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     add_status_panel(&mut commands, &asset_server);
 }
 
-fn add_status_panel(commands: &mut Commands, asset_server: &AssetServer) {
-    commands
-        .spawn_bundle(NodeBundle {
-            style: Style {
-                // justify_content: JustifyContent::Center,
-                align_items: AlignItems::FlexStart,
-                flex_direction: FlexDirection::Column,
-                position_type: PositionType::Absolute,
-                position: Rect {
-                    top: Val::Px(PADDING * 2. + BUTTON_HEIGHT),
-                    right: Val::Px(PADDING * 2. + PALETTE_SIZE),
-                    ..default()
-                },
-                ..default()
-            },
-            color: Color::rgba(0., 0., 0., 0.5).into(),
-            ..default()
-        })
-        .with_children(|parent| {
-            parent
-                .spawn_bundle(TextBundle {
-                    text: Text {
-                        sections: vec![
-                            TextSection {
-                                value: "Health: ".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                                    font_size: STATUS_FONT_SIZE,
-                                    color: TEXT_COLOR,
-                                },
-                            },
-                            TextSection {
-                                value: "".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                                    font_size: STATUS_FONT_SIZE,
-                                    color: SCORE_COLOR,
-                                },
-                            },
-                        ],
-                        ..default()
-                    },
-                    ..default()
-                })
-                .insert(TowerHealthText);
-
-            parent
-                .spawn_bundle(TextBundle {
-                    text: Text {
-                        sections: vec![
-                            TextSection {
-                                value: "Kills: ".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                                    font_size: STATUS_FONT_SIZE,
-                                    color: TEXT_COLOR,
-                                },
-                            },
-                            TextSection {
-                                value: "".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                                    font_size: STATUS_FONT_SIZE,
-                                    color: SCORE_COLOR,
-                                },
-                            },
-                        ],
-                        ..default()
-                    },
-                    ..default()
-                })
-                .insert(TowerScoreText);
-        });
-}
-
 fn update_progress_bar(level: Res<Level>, mut query: Query<&mut Style, With<ProgressBar>>) {
     // println!("dur: {}", level.timer.elapsed_secs());
     let bar = query.get_single_mut();
@@ -183,40 +104,6 @@ fn update_progress_bar(level: Res<Level>, mut query: Query<&mut Style, With<Prog
     if let Ok(mut bar) = bar {
         if let Level::Running { timer, .. } = level.as_ref() {
             bar.size.width = Val::Percent(timer.percent() * 100.);
-        }
-    }
-}
-
-fn update_tower_scoreboard(
-    selected_tower: Res<SelectedTower>,
-    tower_score_query: Query<&TowerScore>,
-    mut text_query: Query<&mut Text, With<TowerScoreText>>,
-) {
-    if let Ok(mut text) = text_query.get_single_mut() {
-        if let Some(selected_tower) = selected_tower
-            .tower
-            .and_then(|tower| tower_score_query.get_component::<TowerScore>(tower).ok())
-        {
-            text.sections[1].value = format!("{:?}", selected_tower.kills);
-        } else {
-            text.sections[1].value = "".to_string();
-        }
-    }
-}
-
-fn update_tower_health(
-    selected_tower: Res<SelectedTower>,
-    tower_health_query: Query<&Health>,
-    mut text_query: Query<&mut Text, With<TowerHealthText>>,
-) {
-    if let Ok(mut text) = text_query.get_single_mut() {
-        if let Some(health) = selected_tower
-            .tower
-            .and_then(|tower| tower_health_query.get_component::<Health>(tower).ok())
-        {
-            text.sections[1].value = format!("{}/{}", health.val, health.max);
-        } else {
-            text.sections[1].value = "".to_string();
         }
     }
 }
