@@ -1,9 +1,9 @@
 use bevy::prelude::*;
 
 use crate::{
-    mouse::SelectedTower,
-    tower::{spawn_towers, TowerScore},
-    ClearEvent, Health, Level, Scoreboard, StageClear,
+    mouse::{MouseCursor, SelectedTower},
+    tower::{spawn_towers, spawn_turret, Tower, TowerScore},
+    ClearEvent, Health, Level, Position, Scoreboard, StageClear,
 };
 
 pub(crate) struct UIPlugin;
@@ -18,6 +18,7 @@ impl Plugin for UIPlugin {
         app.add_system(update_scoreboard);
         app.add_system(update_tower_scoreboard);
         app.add_system(update_tower_health);
+        app.add_system(palette_mouse_system);
         app.add_system(quit_event_system);
         app.add_system(quit_button_system);
         app.add_system(difficulty_button_system);
@@ -55,14 +56,18 @@ struct TowerScoreText;
 struct ProgressBar;
 
 const SCOREBOARD_FONT_SIZE: f32 = 40.0;
-const SCOREBOARD_TEXT_PADDING: Val = Val::Px(5.0);
+const PADDING: f32 = 5.;
+const PADDING_PX: Val = Val::Px(PADDING);
 const TEXT_COLOR: Color = Color::rgb(0.7, 0.7, 0.7);
 const SCORE_COLOR: Color = Color::rgb(1.0, 0.5, 0.5);
 
 const STATUS_FONT_SIZE: f32 = 20.0;
 
+const BUTTON_HEIGHT: f32 = 65.0;
 const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
+
+const PALETTE_SIZE: f32 = 64.;
 
 fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     // Scoreboard
@@ -72,8 +77,8 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 margin: Rect::all(Val::Auto),
                 position_type: PositionType::Absolute,
                 position: Rect {
-                    top: SCOREBOARD_TEXT_PADDING,
-                    left: SCOREBOARD_TEXT_PADDING,
+                    top: PADDING_PX,
+                    left: PADDING_PX,
                     ..default()
                 },
                 justify_content: JustifyContent::Center,
@@ -111,8 +116,8 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                     // style: Style {
                     //     position_type: PositionType::Absolute,
                     //     position: Rect {
-                    //         top: SCOREBOARD_TEXT_PADDING,
-                    //         left: SCOREBOARD_TEXT_PADDING,
+                    //         top: PADDING_PX,
+                    //         left: PADDING_PX,
                     //         ..default()
                     //     },
                     //     ..default()
@@ -147,8 +152,8 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                     // style: Style {
                     //     position_type: PositionType::Absolute,
                     //     position: Rect {
-                    //         top: SCOREBOARD_TEXT_PADDING,
-                    //         left: SCOREBOARD_TEXT_PADDING,
+                    //         top: PADDING_PX,
+                    //         left: PADDING_PX,
                     //         ..default()
                     //     },
                     //     ..default()
@@ -187,18 +192,24 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 .insert(ProgressBar);
         });
 
-    // Quit button
+    add_quit_button(&mut commands, &asset_server);
+    add_palette_buttons(&mut commands, &asset_server);
+    add_difficulty_buttons(&mut commands, &asset_server);
+    add_status_panel(&mut commands, &asset_server);
+}
+
+fn add_quit_button(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     commands
         .spawn_bundle(ButtonBundle {
             style: Style {
-                size: Size::new(Val::Px(150.0), Val::Px(65.0)),
+                size: Size::new(Val::Px(150.0), Val::Px(BUTTON_HEIGHT)),
                 margin: Rect::all(Val::Auto),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 position_type: PositionType::Absolute,
                 position: Rect {
-                    top: SCOREBOARD_TEXT_PADDING,
-                    right: SCOREBOARD_TEXT_PADDING,
+                    top: PADDING_PX,
+                    right: PADDING_PX,
                     ..default()
                 },
                 ..default()
@@ -223,8 +234,135 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 })
                 .insert(QuitButtonFilter);
         });
+}
 
-    // Difficulty buttons
+fn add_palette_buttons(commands: &mut Commands, asset_server: &Res<AssetServer>) {
+    commands
+        .spawn_bundle(NodeBundle {
+            style: Style {
+                size: Size::new(Val::Px(PALETTE_SIZE), Val::Percent(100.0)),
+                margin: Rect::all(Val::Auto),
+                justify_content: JustifyContent::FlexStart,
+                align_items: AlignItems::FlexStart,
+                flex_direction: FlexDirection::ColumnReverse,
+                position_type: PositionType::Absolute,
+                position: Rect {
+                    top: Val::Px(PADDING * 2. + BUTTON_HEIGHT),
+                    right: PADDING_PX,
+                    ..default()
+                },
+                ..default()
+            },
+            color: Color::NONE.into(),
+            ..default()
+        })
+        .with_children(|parent| {
+            add_tower_icon(parent, &asset_server, "turret.png");
+            add_tower_icon(parent, &asset_server, "shotgun.png");
+            add_tower_icon(parent, &asset_server, "healer.png");
+            add_tower_icon(parent, &asset_server, "missile-tower.png");
+        });
+}
+
+#[derive(Component)]
+struct TowerPalette;
+
+fn add_tower_icon(parent: &mut ChildBuilder, asset_server: &Res<AssetServer>, file: &str) {
+    parent
+        .spawn_bundle(NodeBundle {
+            style: Style {
+                size: Size::new(Val::Px(PALETTE_SIZE), Val::Px(PALETTE_SIZE)),
+                border: Rect::all(Val::Px(2.0)),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::FlexEnd,
+                ..default()
+            },
+            color: Color::rgba(0.0, 0.0, 0.0, 0.5).into(),
+            ..default()
+        })
+        .with_children(|parent| {
+            parent
+                .spawn_bundle(ImageBundle {
+                    style: Style {
+                        size: Size::new(Val::Px(PALETTE_SIZE), Val::Px(PALETTE_SIZE)),
+                        ..default()
+                    },
+                    image: UiImage::from(asset_server.load(file)).into(),
+                    ..default()
+                })
+                .insert(Interaction::default())
+                .insert(TowerPalette);
+        });
+}
+
+fn palette_mouse_system(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    windows: Res<Windows>,
+    level: Res<Level>,
+    mut query: Query<(&mut Transform, &mut Visibility), With<MouseCursor>>,
+    query_towers: Query<(&Interaction, &Parent), (Changed<Interaction>, With<TowerPalette>)>,
+    mut query_ui_color: Query<&mut UiColor>,
+    btn: Res<Input<MouseButton>>,
+    mut selected_tower: ResMut<SelectedTower>,
+) {
+    if selected_tower.dragging || !level._is_running() {
+        return;
+    }
+
+    let window = if let Some(window) = windows.iter().next() {
+        window
+    } else {
+        return;
+    };
+    let mouse = window.cursor_position();
+
+    if let Some(((mut cursor_transform, mut visibility), mouse_position)) =
+        query.get_single_mut().ok().zip(mouse)
+    {
+        let (width, height) = (window.width(), window.height());
+        let mouse_screen = Vec2::new(
+            mouse_position.x - width / 2.,
+            mouse_position.y - height / 2.,
+        );
+        // println!("Mouse: {:?} -> {:?}", mouse_position, mouse_screen);
+        for (interaction, parent) in query_towers.iter() {
+            if let Ok(mut ui_color) = query_ui_color.get_component_mut::<UiColor>(**parent) {
+                // println!("Has ui_color: {ui_color:?}");
+                match *interaction {
+                    Interaction::Clicked => {
+                        println!("Clicked tower palette at {mouse_screen:?}");
+                        *ui_color = Color::rgba(1., 0., 1., 0.75).into();
+
+                        visibility.is_visible = true;
+                        *cursor_transform =
+                            Transform::from_xyz(mouse_screen.x, mouse_screen.y, 0.2)
+                                .with_scale(Vec3::new(2., 2., 1.));
+
+                        let tower = spawn_turret(&mut commands, &asset_server, mouse_screen, 0.);
+                        selected_tower.tower = Some(tower);
+
+                        if btn.just_pressed(MouseButton::Left) {
+                            selected_tower.dragging = true;
+                        }
+                        return;
+                    }
+                    Interaction::Hovered => {
+                        *ui_color = Color::rgba(0.5, 0., 0., 0.5).into();
+                    }
+                    Interaction::None => {
+                        *ui_color = Color::rgba(0.0, 0., 0., 0.5).into();
+                    }
+                }
+            }
+        }
+    }
+    if btn.just_released(MouseButton::Left) {
+        selected_tower.dragging = false;
+    }
+}
+
+fn add_difficulty_buttons(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     commands
         .spawn_bundle(NodeBundle {
             style: Style {
@@ -272,7 +410,9 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                     });
             }
         });
+}
 
+fn add_status_panel(commands: &mut Commands, asset_server: &AssetServer) {
     commands
         .spawn_bundle(NodeBundle {
             style: Style {
@@ -281,8 +421,8 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
                 flex_direction: FlexDirection::Column,
                 position_type: PositionType::Absolute,
                 position: Rect {
-                    top: Val::Px(80.0),
-                    right: SCOREBOARD_TEXT_PADDING,
+                    top: Val::Px(PADDING * 2. + BUTTON_HEIGHT),
+                    right: Val::Px(PADDING * 2. + PALETTE_SIZE),
                     ..default()
                 },
                 ..default()

@@ -107,25 +107,51 @@ const MISSILE_HEALTH: Health = Health::new(30.);
 
 pub(crate) fn spawn_towers(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     for i in 0..3 {
-        let tower = TowerBundle::new(
+        spawn_turret(
             commands,
-            Position(Vec2::new(i as f32 * 100.0 - 100., 0.0)),
-            Rotation(i as f64 * std::f64::consts::PI / 3.),
-            TOWER_HEALTH,
+            asset_server,
+            Vec2::new(i as f32 * 100.0 - 100., 0.0),
+            i as f64 * std::f64::consts::PI / 3.,
         );
-        commands
-            .spawn_bundle(SpriteBundle {
-                texture: asset_server.load("turret.png"),
-                ..default()
-            })
-            .insert_bundle(tower)
-            .insert(BulletShooter::new());
     }
 
+    spawn_shotgun(commands, asset_server, Vec2::new(0.0, -100.0), 0.);
+    spawn_healer(commands, asset_server, Vec2::new(0.0, 100.0), 0.);
+    spawn_missile_tower(commands, asset_server, Vec2::new(100.0, 100.0), 0.);
+}
+
+pub(crate) fn spawn_turret(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    position: Vec2,
+    rotation: f64,
+) -> Entity {
     let tower = TowerBundle::new(
         commands,
-        Position(Vec2::new(0.0, -100.0)),
-        Rotation(0.),
+        Position(position),
+        Rotation(rotation),
+        TOWER_HEALTH,
+    );
+    commands
+        .spawn_bundle(SpriteBundle {
+            texture: asset_server.load("turret.png"),
+            ..default()
+        })
+        .insert_bundle(tower)
+        .insert(BulletShooter::new())
+        .id()
+}
+
+pub(crate) fn spawn_shotgun(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    position: Vec2,
+    rotation: f64,
+) -> Entity {
+    let tower = TowerBundle::new(
+        commands,
+        Position(position),
+        Rotation(rotation),
         SHOTGUN_HEALTH,
     );
     commands
@@ -135,12 +161,20 @@ pub(crate) fn spawn_towers(commands: &mut Commands, asset_server: &Res<AssetServ
         })
         .insert_bundle(tower)
         .insert(BulletShooter::new())
-        .insert(Shotgun);
+        .insert(Shotgun)
+        .id()
+}
 
+pub(crate) fn spawn_healer(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    position: Vec2,
+    rotation: f64,
+) -> Entity {
     let tower = TowerBundle::new(
         commands,
-        Position(Vec2::new(0.0, 100.0)),
-        Rotation(0.),
+        Position(position),
+        Rotation(rotation),
         HEALER_HEALTH,
     );
     commands
@@ -149,12 +183,20 @@ pub(crate) fn spawn_towers(commands: &mut Commands, asset_server: &Res<AssetServ
             ..default()
         })
         .insert_bundle(tower)
-        .insert(Healer::new());
+        .insert(Healer::new())
+        .id()
+}
 
+pub(crate) fn spawn_missile_tower(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    position: Vec2,
+    rotation: f64,
+) -> Entity {
     let tower = TowerBundle::new(
         commands,
-        Position(Vec2::new(100.0, 100.0)),
-        Rotation(0.),
+        Position(position),
+        Rotation(rotation),
         MISSILE_HEALTH,
     );
     commands
@@ -164,7 +206,8 @@ pub(crate) fn spawn_towers(commands: &mut Commands, asset_server: &Res<AssetServ
         })
         .insert_bundle(tower)
         .insert(BulletShooter::new())
-        .insert(MissileTower);
+        .insert(MissileTower)
+        .id()
 }
 
 const HEALTH_BAR_WIDTH: f32 = 80.;
