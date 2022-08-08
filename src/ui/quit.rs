@@ -2,12 +2,13 @@ use bevy::prelude::*;
 
 use crate::{ClearEvent, Level, StageClear};
 
-use super::{
-    QuitButtonFilter, QuitEvent, BUTTON_HEIGHT, PADDING_PX, SCOREBOARD_FONT_SIZE, TEXT_COLOR,
-};
+use super::{QuitEvent, BUTTON_HEIGHT, PADDING_PX, SCOREBOARD_FONT_SIZE, TEXT_COLOR};
 
 const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
 pub(super) const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
+
+#[derive(Component)]
+pub(super) struct QuitButtonFilter;
 
 pub(super) fn add_quit_button(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     commands

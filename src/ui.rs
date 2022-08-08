@@ -1,5 +1,6 @@
 mod difficulty_select;
 mod quit;
+mod scoreboard;
 mod tower_palette;
 
 use bevy::prelude::*;
@@ -10,9 +11,10 @@ use self::{
         show_difficulty_buttons_system,
     },
     quit::{add_quit_button, quit_button_system, quit_event_system, show_quit_button_system},
+    scoreboard::{add_scoreboard, update_credits, update_level, update_scoreboard},
     tower_palette::{add_palette_buttons, palette_mouse_system},
 };
-use crate::{mouse::SelectedTower, tower::TowerScore, Health, Level, Scoreboard};
+use crate::{mouse::SelectedTower, tower::TowerScore, Health, Level};
 
 pub(crate) struct UIPlugin;
 
@@ -41,18 +43,6 @@ struct StartEvent(usize);
 struct QuitEvent;
 
 #[derive(Component)]
-struct QuitButtonFilter;
-
-#[derive(Component)]
-struct LevelText;
-
-#[derive(Component)]
-struct ScoreText;
-
-#[derive(Component)]
-struct CreditsText;
-
-#[derive(Component)]
 struct TowerHealthText;
 
 #[derive(Component)]
@@ -74,134 +64,7 @@ const BUTTON_HEIGHT: f32 = 65.0;
 const PALETTE_SIZE: f32 = 64.;
 
 fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
-    // Scoreboard
-    commands
-        .spawn_bundle(NodeBundle {
-            style: Style {
-                margin: Rect::all(Val::Auto),
-                position_type: PositionType::Absolute,
-                position: Rect {
-                    top: PADDING_PX,
-                    left: PADDING_PX,
-                    ..default()
-                },
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::FlexStart,
-                flex_direction: FlexDirection::ColumnReverse,
-                ..default()
-            },
-            color: Color::rgba(0., 0., 0., 0.5).into(),
-            ..default()
-        })
-        .with_children(|parent| {
-            parent
-                .spawn_bundle(TextBundle {
-                    text: Text {
-                        sections: vec![
-                            TextSection {
-                                value: "Level: ".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                                    font_size: SCOREBOARD_FONT_SIZE,
-                                    color: TEXT_COLOR,
-                                },
-                            },
-                            TextSection {
-                                value: "".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                                    font_size: SCOREBOARD_FONT_SIZE,
-                                    color: SCORE_COLOR,
-                                },
-                            },
-                        ],
-                        ..default()
-                    },
-                    // style: Style {
-                    //     position_type: PositionType::Absolute,
-                    //     position: Rect {
-                    //         top: PADDING_PX,
-                    //         left: PADDING_PX,
-                    //         ..default()
-                    //     },
-                    //     ..default()
-                    // },
-                    ..default()
-                })
-                .insert(LevelText);
-
-            parent
-                .spawn_bundle(TextBundle {
-                    text: Text {
-                        sections: vec![
-                            TextSection {
-                                value: "Score: ".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                                    font_size: SCOREBOARD_FONT_SIZE,
-                                    color: TEXT_COLOR,
-                                },
-                            },
-                            TextSection {
-                                value: "".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                                    font_size: SCOREBOARD_FONT_SIZE,
-                                    color: SCORE_COLOR,
-                                },
-                            },
-                        ],
-                        ..default()
-                    },
-                    // style: Style {
-                    //     position_type: PositionType::Absolute,
-                    //     position: Rect {
-                    //         top: PADDING_PX,
-                    //         left: PADDING_PX,
-                    //         ..default()
-                    //     },
-                    //     ..default()
-                    // },
-                    ..default()
-                })
-                .insert(ScoreText);
-
-            parent
-                .spawn_bundle(TextBundle {
-                    text: Text {
-                        sections: vec![
-                            TextSection {
-                                value: "Credit: ".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                                    font_size: SCOREBOARD_FONT_SIZE,
-                                    color: TEXT_COLOR,
-                                },
-                            },
-                            TextSection {
-                                value: "".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                                    font_size: SCOREBOARD_FONT_SIZE,
-                                    color: SCORE_COLOR,
-                                },
-                            },
-                        ],
-                        ..default()
-                    },
-                    // style: Style {
-                    //     position_type: PositionType::Absolute,
-                    //     position: Rect {
-                    //         top: PADDING_PX,
-                    //         left: PADDING_PX,
-                    //         ..default()
-                    //     },
-                    //     ..default()
-                    // },
-                    ..default()
-                })
-                .insert(CreditsText);
-        });
+    add_scoreboard(&mut commands, &asset_server);
 
     commands
         .spawn_bundle(NodeBundle {
@@ -321,28 +184,6 @@ fn update_progress_bar(level: Res<Level>, mut query: Query<&mut Style, With<Prog
         if let Level::Running { timer, .. } = level.as_ref() {
             bar.size.width = Val::Percent(timer.percent() * 100.);
         }
-    }
-}
-
-fn update_level(level: Res<Level>, mut query: Query<&mut Text, With<LevelText>>) {
-    if let Ok(mut text) = query.get_single_mut() {
-        text.sections[1].value = if let Level::Running { difficulty, .. } = level.as_ref() {
-            format!("{}", difficulty)
-        } else {
-            "-".to_string()
-        }
-    }
-}
-
-fn update_scoreboard(scoreboard: Res<Scoreboard>, mut query: Query<&mut Text, With<ScoreText>>) {
-    if let Ok(mut text) = query.get_single_mut() {
-        text.sections[1].value = format!("{}", scoreboard.score);
-    }
-}
-
-fn update_credits(scoreboard: Res<Scoreboard>, mut query: Query<&mut Text, With<CreditsText>>) {
-    if let Ok(mut text) = query.get_single_mut() {
-        text.sections[1].value = format!("${}", scoreboard.credits);
     }
 }
 
