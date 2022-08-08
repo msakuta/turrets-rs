@@ -2,8 +2,10 @@ use bevy::prelude::*;
 
 use crate::{
     mouse::{MouseCursor, SelectedTower},
-    tower::{spawn_towers, spawn_turret, Tower, TowerScore},
-    ClearEvent, Health, Level, Position, Scoreboard, StageClear,
+    tower::{
+        spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_towers, spawn_turret, TowerScore,
+    },
+    ClearEvent, Health, Level, Scoreboard, StageClear,
 };
 
 pub(crate) struct UIPlugin;
@@ -236,6 +238,30 @@ fn add_quit_button(commands: &mut Commands, asset_server: &Res<AssetServer>) {
         });
 }
 
+#[derive(Component)]
+enum TowerPalette {
+    Turret,
+    Shotgun,
+    Healer,
+    MissileTower,
+}
+
+impl TowerPalette {
+    fn spawn(
+        &self,
+        commands: &mut Commands,
+        asset_server: &Res<AssetServer>,
+        position: Vec2,
+    ) -> Entity {
+        match self {
+            Self::Turret => spawn_turret(commands, asset_server, position, 0.),
+            Self::Shotgun => spawn_shotgun(commands, asset_server, position, 0.),
+            Self::Healer => spawn_healer(commands, asset_server, position, 0.),
+            Self::MissileTower => spawn_missile_tower(commands, asset_server, position, 0.),
+        }
+    }
+}
+
 fn add_palette_buttons(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     commands
         .spawn_bundle(NodeBundle {
@@ -257,17 +283,24 @@ fn add_palette_buttons(commands: &mut Commands, asset_server: &Res<AssetServer>)
             ..default()
         })
         .with_children(|parent| {
-            add_tower_icon(parent, &asset_server, "turret.png");
-            add_tower_icon(parent, &asset_server, "shotgun.png");
-            add_tower_icon(parent, &asset_server, "healer.png");
-            add_tower_icon(parent, &asset_server, "missile-tower.png");
+            add_tower_icon(parent, &asset_server, "turret.png", TowerPalette::Turret);
+            add_tower_icon(parent, &asset_server, "shotgun.png", TowerPalette::Shotgun);
+            add_tower_icon(parent, &asset_server, "healer.png", TowerPalette::Healer);
+            add_tower_icon(
+                parent,
+                &asset_server,
+                "missile-tower.png",
+                TowerPalette::MissileTower,
+            );
         });
 }
 
-#[derive(Component)]
-struct TowerPalette;
-
-fn add_tower_icon(parent: &mut ChildBuilder, asset_server: &Res<AssetServer>, file: &str) {
+fn add_tower_icon(
+    parent: &mut ChildBuilder,
+    asset_server: &Res<AssetServer>,
+    file: &str,
+    comp: TowerPalette,
+) {
     parent
         .spawn_bundle(NodeBundle {
             style: Style {
@@ -291,7 +324,7 @@ fn add_tower_icon(parent: &mut ChildBuilder, asset_server: &Res<AssetServer>, fi
                     ..default()
                 })
                 .insert(Interaction::default())
-                .insert(TowerPalette);
+                .insert(comp);
         });
 }
 
@@ -301,9 +334,8 @@ fn palette_mouse_system(
     windows: Res<Windows>,
     level: Res<Level>,
     mut query: Query<(&mut Transform, &mut Visibility), With<MouseCursor>>,
-    query_towers: Query<(&Interaction, &Parent), (Changed<Interaction>, With<TowerPalette>)>,
+    query_towers: Query<(&Interaction, &Parent, &TowerPalette), Changed<Interaction>>,
     mut query_ui_color: Query<&mut UiColor>,
-    btn: Res<Input<MouseButton>>,
     mut selected_tower: ResMut<SelectedTower>,
 ) {
     if selected_tower.dragging || !level._is_running() {
@@ -326,7 +358,7 @@ fn palette_mouse_system(
             mouse_position.y - height / 2.,
         );
         // println!("Mouse: {:?} -> {:?}", mouse_position, mouse_screen);
-        for (interaction, parent) in query_towers.iter() {
+        for (interaction, parent, palette) in query_towers.iter() {
             if let Ok(mut ui_color) = query_ui_color.get_component_mut::<UiColor>(**parent) {
                 // println!("Has ui_color: {ui_color:?}");
                 match *interaction {
@@ -339,12 +371,10 @@ fn palette_mouse_system(
                             Transform::from_xyz(mouse_screen.x, mouse_screen.y, 0.2)
                                 .with_scale(Vec3::new(2., 2., 1.));
 
-                        let tower = spawn_turret(&mut commands, &asset_server, mouse_screen, 0.);
+                        let tower = palette.spawn(&mut commands, &asset_server, mouse_screen);
                         selected_tower.tower = Some(tower);
+                        selected_tower.dragging = true;
 
-                        if btn.just_pressed(MouseButton::Left) {
-                            selected_tower.dragging = true;
-                        }
                         return;
                     }
                     Interaction::Hovered => {
@@ -356,9 +386,6 @@ fn palette_mouse_system(
                 }
             }
         }
-    }
-    if btn.just_released(MouseButton::Left) {
-        selected_tower.dragging = false;
     }
 }
 
