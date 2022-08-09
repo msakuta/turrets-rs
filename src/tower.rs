@@ -2,7 +2,7 @@ mod healer;
 
 use self::healer::{heal_target, healer_find_target};
 use crate::{
-    bullet::SHOOT_INTERVAL, mouse::SelectedTower, BulletFilter, BulletShooter, Enemy, Health,
+    bullet::SHOOT_INTERVAL, mouse::tower_not_dragging, BulletFilter, BulletShooter, Enemy, Health,
     Level, Position, Rotation, Scoreboard, StageClear, Target,
 };
 use bevy::prelude::*;
@@ -75,12 +75,15 @@ pub(crate) struct TowerPlugin;
 
 impl Plugin for TowerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(update_health_bar)
-            .add_system(tower_find_target)
-            .add_system(healer_find_target)
-            .add_system(heal_target)
-            .add_system(timeout)
-            .add_system(spawn_towers_new_game);
+        app.add_system(update_health_bar).add_system_set(
+            SystemSet::new()
+                .with_run_criteria(tower_not_dragging)
+                .with_system(tower_find_target)
+                .with_system(healer_find_target)
+                .with_system(heal_target)
+                .with_system(timeout)
+                .with_system(spawn_towers_new_game),
+        );
     }
 }
 
@@ -264,12 +267,7 @@ pub(crate) fn update_health_bar(
 fn tower_find_target(
     mut query: Query<(&mut Rotation, &Position, &mut BulletShooter, &mut Target), With<Tower>>,
     enemy_query: Query<(Entity, &Position), With<Enemy>>,
-    selected_tower: Res<SelectedTower>,
 ) {
-    if selected_tower.dragging {
-        return;
-    }
-
     for (mut rotation, position, mut bullet_shooter, mut target) in query.iter_mut() {
         let new_target = enemy_query
             .iter()
@@ -318,11 +316,7 @@ fn timeout(
     mut commands: Commands,
     time: Res<Time>,
     mut query: Query<(Entity, &mut Sprite, &mut Timeout)>,
-    selected_tower: Res<SelectedTower>,
 ) {
-    if selected_tower.dragging {
-        return;
-    }
     let delta = time.delta_seconds();
     for (entity, mut sprite, mut timeout) in query.iter_mut() {
         if timeout.0 < delta {

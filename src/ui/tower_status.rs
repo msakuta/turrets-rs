@@ -2,9 +2,7 @@ use bevy::prelude::*;
 
 use crate::{mouse::SelectedTower, tower::TowerScore, Health};
 
-use super::{
-    spawn_text, BUTTON_HEIGHT, PADDING, PALETTE_SIZE, SCORE_COLOR, STATUS_FONT_SIZE, TEXT_COLOR,
-};
+use super::{spawn_text, BUTTON_HEIGHT, PADDING, PALETTE_SIZE};
 
 #[derive(Component)]
 pub(super) struct TowerHealthText;
@@ -48,8 +46,9 @@ pub(super) fn update_tower_scoreboard(
 ) {
     if let Ok(mut text) = text_query.get_single_mut() {
         if let Some(selected_tower) = selected_tower
-            .tower
-            .and_then(|tower| tower_score_query.get_component::<TowerScore>(tower).ok())
+            .as_ref()
+            .as_ref()
+            .and_then(|tower| tower_score_query.get(tower.tower).ok())
         {
             text.sections[1].value = format!("{:?}", selected_tower.kills);
         } else {
@@ -65,8 +64,9 @@ pub(super) fn update_tower_health(
 ) {
     if let Ok(mut text) = text_query.get_single_mut() {
         if let Some(health) = selected_tower
-            .tower
-            .and_then(|tower| tower_health_query.get_component::<Health>(tower).ok())
+            .as_ref()
+            .as_ref()
+            .and_then(|tower| tower_health_query.get(tower.tower).ok())
         {
             text.sections[1].value = format!("{}/{}", health.val, health.max);
         } else {

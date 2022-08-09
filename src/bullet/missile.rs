@@ -1,4 +1,4 @@
-use crate::{mouse::SelectedTower, BulletFilter, Health, Position, Rotation, StageClear, Velocity};
+use crate::{BulletFilter, Health, Position, Rotation, StageClear, Velocity};
 use bevy::{ecs::system::QueryComponentError, prelude::*};
 use bevy_prototype_lyon::prelude::*;
 use std::collections::VecDeque;
@@ -41,11 +41,7 @@ pub(super) fn missile_system(
     health_query: Query<&Health>,
     target_query: Query<(Entity, &Position, &BulletFilter)>,
     mut trail_query: Query<&mut Path>,
-    selected_tower: Res<SelectedTower>,
 ) {
-    if selected_tower.dragging {
-        return;
-    }
     let delta_time = time.delta_seconds();
     for (entity, mut missile, mut rotation, position, mut velocity) in query.iter_mut() {
         // Delete expired missiles (and don't forget the trail)

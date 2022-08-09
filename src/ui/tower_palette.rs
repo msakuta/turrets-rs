@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
-    mouse::{MouseCursor, SelectedTower},
+    mouse::{MouseCursor, SelectedTower, SelectedTowerProps},
     tower::{spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_turret},
     Level, Scoreboard,
 };
@@ -136,7 +136,13 @@ fn palette_mouse_system(
     mut query_ui_color: Query<&mut UiColor>,
     mut selected_tower: ResMut<SelectedTower>,
 ) {
-    if selected_tower.dragging || !level._is_running() {
+    if selected_tower
+        .as_ref()
+        .as_ref()
+        .map(|f| f.dragging)
+        .unwrap_or(false)
+        || !level._is_running()
+    {
         return;
     }
 
@@ -176,8 +182,11 @@ fn palette_mouse_system(
                                 .with_scale(Vec3::new(2., 2., 1.));
 
                         let tower = palette.spawn(&mut commands, &asset_server, mouse_screen);
-                        selected_tower.tower = Some(tower);
-                        selected_tower.dragging = true;
+                        *selected_tower = Some(SelectedTowerProps {
+                            tower,
+                            dragging: true,
+                            hovering_trashcan: false,
+                        });
 
                         scoreboard.credits -= cost;
 
@@ -355,7 +364,7 @@ fn trashcan_tooltip_system(
                 if let Ok(mut ui_color) = query_ui_color.get_mut(**parent) {
                     *ui_color = Color::rgba(0.5, 0., 0., 0.5).into();
                 }
-                if selected_tower.tower.is_some() {
+                if let Some(selected_tower) = selected_tower.as_mut() {
                     selected_tower.hovering_trashcan = true;
                 }
             }
@@ -366,7 +375,7 @@ fn trashcan_tooltip_system(
                 if let Ok(mut ui_color) = query_ui_color.get_mut(**parent) {
                     *ui_color = Color::rgba(0.0, 0., 0., 0.5).into();
                 }
-                if selected_tower.tower.is_some() {
+                if let Some(selected_tower) = selected_tower.as_mut() {
                     selected_tower.hovering_trashcan = false;
                 }
             }

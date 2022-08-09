@@ -16,11 +16,7 @@ pub(crate) fn spawn_enemies(
     windows: Res<Windows>,
     time: Res<Time>,
     level: Res<Level>,
-    selected_tower: Res<SelectedTower>,
 ) {
-    if selected_tower.dragging {
-        return;
-    }
     let enemy_count = query.iter().count();
     if MAX_ENEMIES <= enemy_count {
         return;

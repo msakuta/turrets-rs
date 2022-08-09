@@ -1,5 +1,5 @@
 use super::{Timeout, Tower};
-use crate::{mouse::SelectedTower, Health, Position, Rotation, Target, Velocity};
+use crate::{Health, Position, Rotation, Target, Velocity};
 use bevy::prelude::*;
 
 #[derive(Component)]
@@ -18,12 +18,7 @@ const HEALER_INTERVAL: f32 = 2.;
 pub(crate) fn healer_find_target(
     mut query: Query<(Entity, &mut Rotation, &Position, &mut Healer, &mut Target), With<Tower>>,
     mut friend_query: Query<(Entity, &Position, &Health), With<Tower>>,
-    selected_tower: Res<SelectedTower>,
 ) {
-    if selected_tower.dragging {
-        return;
-    }
-
     for (entity, mut rotation, position, mut healer, mut target) in query.iter_mut() {
         let new_target =
             friend_query
@@ -79,11 +74,7 @@ pub(crate) fn heal_target(
     asset_server: Res<AssetServer>,
     mut query: Query<(&mut Healer, &Target, &Position)>,
     mut target_query: Query<(&Position, &mut Health)>,
-    selected_tower: Res<SelectedTower>,
 ) {
-    if selected_tower.dragging {
-        return;
-    }
     let delta = time.delta_seconds();
     for (mut healer, target, position) in query.iter_mut() {
         if !healer.0 {
