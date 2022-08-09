@@ -13,7 +13,7 @@ use self::{
     },
     quit::{add_quit_button, quit_button_system, quit_event_system, show_quit_button_system},
     scoreboard::{add_scoreboard, update_credits, update_level, update_scoreboard},
-    tower_palette::{add_palette_buttons, palette_mouse_system, update_palette_system},
+    tower_palette::{add_palette_buttons, build_tower_palette},
     tower_status::{add_status_panel, update_tower_health, update_tower_scoreboard},
 };
 use crate::Level;
@@ -31,8 +31,7 @@ impl Plugin for UIPlugin {
         app.add_system(update_credits);
         app.add_system(update_tower_scoreboard);
         app.add_system(update_tower_health);
-        app.add_system(palette_mouse_system);
-        app.add_system(update_palette_system);
+        build_tower_palette(app);
         app.add_system(quit_event_system);
         app.add_system(quit_button_system);
         app.add_system(show_quit_button_system);
@@ -59,6 +58,7 @@ const STATUS_FONT_SIZE: f32 = 20.0;
 const BUTTON_HEIGHT: f32 = 65.0;
 
 const PALETTE_SIZE: f32 = 64.;
+const PALETTE_ICON_SIZE: f32 = PALETTE_SIZE * 0.75;
 
 fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     add_scoreboard(&mut commands, &asset_server);

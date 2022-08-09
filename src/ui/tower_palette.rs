@@ -6,9 +6,19 @@ use crate::{
     Level, Scoreboard,
 };
 
-use super::{BUTTON_HEIGHT, PADDING, PADDING_PX, PALETTE_SIZE};
+use super::{
+    BUTTON_HEIGHT, PADDING, PADDING_PX, PALETTE_ICON_SIZE, PALETTE_SIZE, SCORE_COLOR,
+    STATUS_FONT_SIZE, TEXT_COLOR,
+};
 
-#[derive(Component)]
+pub(super) fn build_tower_palette(app: &mut App) {
+    app.add_startup_system(add_palette_hint_panel);
+    app.add_system(palette_mouse_system);
+    app.add_system(update_palette_system);
+    app.add_system(palette_tooltip_system);
+}
+
+#[derive(Component, Debug)]
 pub(super) enum TowerPalette {
     Turret,
     Shotgun,
@@ -87,7 +97,7 @@ fn add_tower_icon(
                 size: Size::new(Val::Px(PALETTE_SIZE), Val::Px(PALETTE_SIZE)),
                 border: Rect::all(Val::Px(2.0)),
                 justify_content: JustifyContent::Center,
-                align_items: AlignItems::FlexEnd,
+                align_items: AlignItems::Center,
                 ..default()
             },
             color: Color::rgba(0.0, 0.0, 0.0, 0.5).into(),
@@ -97,7 +107,7 @@ fn add_tower_icon(
             parent
                 .spawn_bundle(ImageBundle {
                     style: Style {
-                        size: Size::new(Val::Px(PALETTE_SIZE), Val::Px(PALETTE_SIZE)),
+                        size: Size::new(Val::Px(PALETTE_ICON_SIZE), Val::Px(PALETTE_ICON_SIZE)),
                         ..default()
                     },
                     image: UiImage::from(asset_server.load(file)).into(),
@@ -108,7 +118,7 @@ fn add_tower_icon(
         });
 }
 
-pub(super) fn palette_mouse_system(
+fn palette_mouse_system(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     windows: Res<Windows>,
@@ -178,7 +188,7 @@ pub(super) fn palette_mouse_system(
     }
 }
 
-pub(super) fn update_palette_system(
+fn update_palette_system(
     mut query: Query<(&mut UiColor, &TowerPalette)>,
     scoreboard: Res<Scoreboard>,
 ) {
@@ -188,5 +198,116 @@ pub(super) fn update_palette_system(
         } else {
             Color::WHITE.into()
         };
+    }
+}
+
+#[derive(Component)]
+struct PaletteHintText;
+
+#[derive(Component)]
+struct PaletteHintTowerType;
+
+fn add_palette_hint_panel(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands
+        .spawn_bundle(NodeBundle {
+            style: Style {
+                // justify_content: JustifyContent::Center,
+                align_items: AlignItems::FlexStart,
+                flex_direction: FlexDirection::Column,
+                position_type: PositionType::Absolute,
+                position: Rect {
+                    top: Val::Px(PADDING * 4. + BUTTON_HEIGHT + STATUS_FONT_SIZE * 2.),
+                    right: Val::Px(PADDING * 2. + PALETTE_SIZE),
+                    ..default()
+                },
+                ..default()
+            },
+            visibility: Visibility { is_visible: false },
+            color: Color::rgba(0., 0., 0., 0.8).into(),
+            ..default()
+        })
+        .insert(PaletteHintText)
+        .with_children(|parent| {
+            parent
+                .spawn_bundle(TextBundle {
+                    text: Text {
+                        sections: vec![TextSection {
+                            value: "Tower type".to_string(),
+                            style: TextStyle {
+                                font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                                font_size: STATUS_FONT_SIZE,
+                                color: TEXT_COLOR,
+                            },
+                        }],
+                        ..default()
+                    },
+                    visibility: Visibility { is_visible: false },
+                    ..default()
+                })
+                .insert(PaletteHintText)
+                .insert(PaletteHintTowerType);
+
+            parent
+                .spawn_bundle(TextBundle {
+                    text: Text {
+                        sections: vec![
+                            TextSection {
+                                value: "Cost: ".to_string(),
+                                style: TextStyle {
+                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
+                                    font_size: STATUS_FONT_SIZE,
+                                    color: TEXT_COLOR,
+                                },
+                            },
+                            TextSection {
+                                value: "".to_string(),
+                                style: TextStyle {
+                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
+                                    font_size: STATUS_FONT_SIZE,
+                                    color: SCORE_COLOR,
+                                },
+                            },
+                        ],
+                        ..default()
+                    },
+                    visibility: Visibility { is_visible: false },
+                    ..default()
+                })
+                .insert(PaletteHintText);
+        });
+}
+
+fn palette_tooltip_system(
+    query_towers: Query<(&Interaction, &TowerPalette), Changed<Interaction>>,
+    mut query_tooltip_visible: Query<&mut Visibility, With<PaletteHintText>>,
+    mut query_tooltip_tower_type: Query<
+        &mut Text,
+        (With<PaletteHintText>, With<PaletteHintTowerType>),
+    >,
+    mut query_tooltip_cost: Query<
+        &mut Text,
+        (With<PaletteHintText>, Without<PaletteHintTowerType>),
+    >,
+) {
+    for (interaction, palette) in query_towers.iter() {
+        match *interaction {
+            Interaction::Hovered => {
+                for mut visibility in query_tooltip_visible.iter_mut() {
+                    visibility.is_visible = true;
+                }
+                if let Ok(mut text) = query_tooltip_tower_type.get_single_mut() {
+                    text.sections[0].value = format!("{:?}", palette);
+                }
+                if let Ok(mut text) = query_tooltip_cost.get_single_mut() {
+                    text.sections[1].value = format!("${}", palette.cost());
+                }
+            }
+            Interaction::None => {
+                for mut visibility in query_tooltip_visible.iter_mut() {
+                    visibility.is_visible = false;
+                }
+            }
+            _ => (),
+        }
     }
 }
