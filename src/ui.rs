@@ -13,7 +13,7 @@ use self::{
     },
     quit::{add_quit_button, quit_button_system, quit_event_system, show_quit_button_system},
     scoreboard::{add_scoreboard, update_credits, update_level, update_scoreboard},
-    tower_palette::{add_palette_buttons, palette_mouse_system},
+    tower_palette::{add_palette_buttons, palette_mouse_system, update_palette_system},
     tower_status::{add_status_panel, update_tower_health, update_tower_scoreboard},
 };
 use crate::Level;
@@ -32,6 +32,7 @@ impl Plugin for UIPlugin {
         app.add_system(update_tower_scoreboard);
         app.add_system(update_tower_health);
         app.add_system(palette_mouse_system);
+        app.add_system(update_palette_system);
         app.add_system(quit_event_system);
         app.add_system(quit_button_system);
         app.add_system(show_quit_button_system);

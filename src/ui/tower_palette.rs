@@ -79,7 +79,7 @@ fn add_tower_icon(
     parent: &mut ChildBuilder,
     asset_server: &Res<AssetServer>,
     file: &str,
-    comp: TowerPalette,
+    tower_palette: TowerPalette,
 ) {
     parent
         .spawn_bundle(NodeBundle {
@@ -104,7 +104,7 @@ fn add_tower_icon(
                     ..default()
                 })
                 .insert(Interaction::default())
-                .insert(comp);
+                .insert(tower_palette);
         });
 }
 
@@ -175,5 +175,18 @@ pub(super) fn palette_mouse_system(
                 }
             }
         }
+    }
+}
+
+pub(super) fn update_palette_system(
+    mut query: Query<(&mut UiColor, &TowerPalette)>,
+    scoreboard: Res<Scoreboard>,
+) {
+    for (mut color, palette) in query.iter_mut() {
+        *color = if scoreboard.credits < palette.cost() {
+            Color::rgba(0.5, 0.5, 0.5, 0.5).into()
+        } else {
+            Color::WHITE.into()
+        };
     }
 }
