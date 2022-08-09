@@ -17,7 +17,7 @@ pub(super) fn add_difficulty_buttons(commands: &mut Commands, asset_server: &Res
     commands
         .spawn_bundle(NodeBundle {
             style: Style {
-                margin: Rect::all(Val::Auto),
+                margin: UiRect::all(Val::Auto),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 flex_direction: FlexDirection::ColumnReverse,
@@ -33,7 +33,7 @@ pub(super) fn add_difficulty_buttons(commands: &mut Commands, asset_server: &Res
                     .spawn_bundle(ButtonBundle {
                         style: Style {
                             size: Size::new(Val::Px(300.0), Val::Px(65.0)),
-                            margin: Rect::all(Val::Auto),
+                            margin: UiRect::all(Val::Auto),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
                             ..default()
@@ -46,14 +46,13 @@ pub(super) fn add_difficulty_buttons(commands: &mut Commands, asset_server: &Res
                     .with_children(|parent| {
                         parent
                             .spawn_bundle(TextBundle {
-                                text: Text::with_section(
+                                text: Text::from_section(
                                     &format!("Start Level {}", difficulty),
                                     TextStyle {
                                         font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                                         font_size: SCOREBOARD_FONT_SIZE,
                                         color: TEXT_COLOR,
                                     },
-                                    Default::default(),
                                 ),
                                 ..default()
                             })

@@ -15,11 +15,11 @@ pub(super) fn add_quit_button(commands: &mut Commands, asset_server: &Res<AssetS
         .spawn_bundle(ButtonBundle {
             style: Style {
                 size: Size::new(Val::Px(150.0), Val::Px(BUTTON_HEIGHT)),
-                margin: Rect::all(Val::Auto),
+                margin: UiRect::all(Val::Auto),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 position_type: PositionType::Absolute,
-                position: Rect {
+                position: UiRect {
                     top: PADDING_PX,
                     right: PADDING_PX,
                     ..default()
@@ -33,14 +33,13 @@ pub(super) fn add_quit_button(commands: &mut Commands, asset_server: &Res<AssetS
         .with_children(|parent| {
             parent
                 .spawn_bundle(TextBundle {
-                    text: Text::with_section(
+                    text: Text::from_section(
                         "Quit",
                         TextStyle {
                             font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                             font_size: SCOREBOARD_FONT_SIZE,
                             color: TEXT_COLOR,
                         },
-                        Default::default(),
                     ),
                     ..default()
                 })

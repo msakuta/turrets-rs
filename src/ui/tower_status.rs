@@ -18,7 +18,7 @@ pub(super) fn add_status_panel(commands: &mut Commands, asset_server: &AssetServ
                 align_items: AlignItems::FlexStart,
                 flex_direction: FlexDirection::Column,
                 position_type: PositionType::Absolute,
-                position: Rect {
+                position: UiRect {
                     top: Val::Px(PADDING * 2. + BUTTON_HEIGHT),
                     right: Val::Px(PADDING * 2. + PALETTE_SIZE),
                     ..default()

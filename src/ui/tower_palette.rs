@@ -47,12 +47,12 @@ pub(super) fn add_palette_buttons(commands: &mut Commands, asset_server: &Res<As
         .spawn_bundle(NodeBundle {
             style: Style {
                 size: Size::new(Val::Px(PALETTE_SIZE), Val::Percent(100.0)),
-                margin: Rect::all(Val::Auto),
+                margin: UiRect::all(Val::Auto),
                 justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::FlexStart,
                 flex_direction: FlexDirection::ColumnReverse,
                 position_type: PositionType::Absolute,
-                position: Rect {
+                position: UiRect {
                     top: Val::Px(PADDING * 2. + BUTTON_HEIGHT),
                     right: PADDING_PX,
                     ..default()
@@ -85,7 +85,7 @@ fn add_tower_icon(
         .spawn_bundle(NodeBundle {
             style: Style {
                 size: Size::new(Val::Px(PALETTE_SIZE), Val::Px(PALETTE_SIZE)),
-                border: Rect::all(Val::Px(2.0)),
+                border: UiRect::all(Val::Px(2.0)),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::FlexEnd,
                 ..default()

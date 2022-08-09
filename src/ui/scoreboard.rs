@@ -18,9 +18,9 @@ pub(super) fn add_scoreboard(commands: &mut Commands, asset_server: &Res<AssetSe
     commands
         .spawn_bundle(NodeBundle {
             style: Style {
-                margin: Rect::all(Val::Auto),
+                margin: UiRect::all(Val::Auto),
                 position_type: PositionType::Absolute,
-                position: Rect {
+                position: UiRect {
                     top: PADDING_PX,
                     left: PADDING_PX,
                     ..default()
@@ -59,7 +59,7 @@ pub(super) fn add_scoreboard(commands: &mut Commands, asset_server: &Res<AssetSe
                     },
                     // style: Style {
                     //     position_type: PositionType::Absolute,
-                    //     position: Rect {
+                    //     position: UiRect {
                     //         top: PADDING_PX,
                     //         left: PADDING_PX,
                     //         ..default()
@@ -95,7 +95,7 @@ pub(super) fn add_scoreboard(commands: &mut Commands, asset_server: &Res<AssetSe
                     },
                     // style: Style {
                     //     position_type: PositionType::Absolute,
-                    //     position: Rect {
+                    //     position: UiRect {
                     //         top: PADDING_PX,
                     //         left: PADDING_PX,
                     //         ..default()
@@ -131,7 +131,7 @@ pub(super) fn add_scoreboard(commands: &mut Commands, asset_server: &Res<AssetSe
                     },
                     // style: Style {
                     //     position_type: PositionType::Absolute,
-                    //     position: Rect {
+                    //     position: UiRect {
                     //         top: PADDING_PX,
                     //         left: PADDING_PX,
                     //         ..default()

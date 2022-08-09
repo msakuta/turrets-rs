@@ -67,12 +67,12 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
             style: Style {
                 size: Size::new(Val::Percent(80.0), Val::Px(20.0)),
                 position_type: PositionType::Absolute,
-                position: Rect {
+                position: UiRect {
                     left: Val::Px(10.0),
                     bottom: Val::Px(10.0),
                     ..default()
                 },
-                border: Rect::all(Val::Px(2.0)),
+                border: UiRect::all(Val::Px(2.0)),
                 ..default()
             },
             color: Color::rgb(0.4, 0.4, 1.0).into(),

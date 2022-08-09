@@ -139,9 +139,9 @@ fn setup(
     });
     commands.insert_resource(Scoreboard::default());
     commands.insert_resource(Level::Select);
-    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
-
-    commands.spawn_bundle(UiCameraBundle::default());
+    commands
+        .spawn_bundle(Camera2dBundle::default())
+        .insert(UiCameraConfig::default());
 
     commands.spawn_bundle(SpriteBundle {
         texture: asset_server.load("cliff-crop.png"),
