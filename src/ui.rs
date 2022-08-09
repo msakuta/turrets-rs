@@ -4,7 +4,7 @@ mod scoreboard;
 mod tower_palette;
 mod tower_status;
 
-use bevy::prelude::*;
+use bevy::{ecs::system::EntityCommands, prelude::*};
 
 use self::{
     difficulty_select::{
@@ -107,4 +107,44 @@ fn update_progress_bar(level: Res<Level>, mut query: Query<&mut Style, With<Prog
             bar.size.width = Val::Percent(timer.percent() * 100.);
         }
     }
+}
+
+/// A helper function to add a text component bundle with a variable number of text sections.
+///
+/// This function assumes the first section of the `text` is a section title, so it has bold style
+/// with different color.
+///
+/// Additional components can be inserted with the 3rd argument closure. We could return EntityCommands to
+/// the caller to let them insert, but lifetime annotations are too annoying so that I used inner closure
+/// to avoid them.
+fn spawn_text(
+    asset_server: &AssetServer,
+    parent: &mut ChildBuilder,
+    text: &[&str],
+    components: impl FnOnce(EntityCommands),
+) {
+    let builder = parent.spawn_bundle(TextBundle {
+        text: Text {
+            sections: text
+                .iter()
+                .enumerate()
+                .map(|(i, text)| TextSection {
+                    value: text.to_string(),
+                    style: TextStyle {
+                        font: asset_server.load(if i == 0 {
+                            "fonts/FiraSans-Bold.ttf"
+                        } else {
+                            "fonts/FiraMono-Medium.ttf"
+                        }),
+                        font_size: STATUS_FONT_SIZE,
+                        color: if i == 0 { TEXT_COLOR } else { SCORE_COLOR },
+                    },
+                })
+                .collect(),
+            ..default()
+        },
+        ..default()
+    });
+
+    components(builder);
 }

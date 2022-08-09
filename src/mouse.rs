@@ -8,6 +8,7 @@ impl Plugin for MousePlugin {
         app.insert_resource(SelectedTower {
             tower: None,
             dragging: false,
+            hovering_trashcan: false,
         });
         app.add_startup_system(setup);
         app.add_system(mouse_system);
@@ -33,9 +34,11 @@ pub(crate) struct MouseCursor;
 pub(crate) struct SelectedTower {
     pub tower: Option<Entity>,
     pub dragging: bool,
+    pub hovering_trashcan: bool,
 }
 
 fn mouse_system(
+    mut commands: Commands,
     windows: Res<Windows>,
     mut query: Query<(&mut Transform, &mut Visibility), With<MouseCursor>>,
     mut query_towers: Query<(Entity, &mut Position), With<Tower>>,
@@ -88,6 +91,11 @@ fn mouse_system(
         }
     }
     if btn.just_released(MouseButton::Left) {
+        if selected_tower.dragging && selected_tower.hovering_trashcan {
+            if let Some(tower) = selected_tower.tower {
+                commands.entity(tower).despawn_recursive();
+            }
+        }
         selected_tower.dragging = false;
     }
 }

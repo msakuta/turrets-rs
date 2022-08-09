@@ -7,19 +7,23 @@ use crate::{
 };
 
 use super::{
-    BUTTON_HEIGHT, PADDING, PADDING_PX, PALETTE_ICON_SIZE, PALETTE_SIZE, SCORE_COLOR,
-    STATUS_FONT_SIZE, TEXT_COLOR,
+    spawn_text, BUTTON_HEIGHT, PADDING, PADDING_PX, PALETTE_ICON_SIZE, PALETTE_SIZE,
+    STATUS_FONT_SIZE,
 };
+
+use std::iter::Iterator;
 
 pub(super) fn build_tower_palette(app: &mut App) {
     app.add_startup_system(add_palette_hint_panel);
+    app.add_startup_system(add_trashcan_hint_panel);
     app.add_system(palette_mouse_system);
     app.add_system(update_palette_system);
     app.add_system(palette_tooltip_system);
+    app.add_system(trashcan_tooltip_system);
 }
 
 #[derive(Component, Debug)]
-pub(super) enum TowerPalette {
+enum TowerPalette {
     Turret,
     Shotgun,
     Healer,
@@ -51,6 +55,9 @@ impl TowerPalette {
         }
     }
 }
+
+#[derive(Component, Debug)]
+struct TowerTrashcan;
 
 pub(super) fn add_palette_buttons(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     commands
@@ -89,7 +96,7 @@ fn add_tower_icon(
     parent: &mut ChildBuilder,
     asset_server: &Res<AssetServer>,
     file: &str,
-    tower_palette: TowerPalette,
+    tower_palette: impl Component,
 ) {
     parent
         .spawn_bundle(NodeBundle {
@@ -202,10 +209,10 @@ fn update_palette_system(
 }
 
 #[derive(Component)]
-struct PaletteHintText;
+struct PaletteTooltipText;
 
 #[derive(Component)]
-struct PaletteHintTowerType;
+struct PaletteTooltipTowerType;
 
 fn add_palette_hint_panel(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
@@ -226,67 +233,30 @@ fn add_palette_hint_panel(mut commands: Commands, asset_server: Res<AssetServer>
             color: Color::rgba(0., 0., 0., 0.8).into(),
             ..default()
         })
-        .insert(PaletteHintText)
+        .insert(PaletteTooltipText)
         .with_children(|parent| {
-            parent
-                .spawn_bundle(TextBundle {
-                    text: Text {
-                        sections: vec![TextSection {
-                            value: "Tower type".to_string(),
-                            style: TextStyle {
-                                font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                                font_size: STATUS_FONT_SIZE,
-                                color: TEXT_COLOR,
-                            },
-                        }],
-                        ..default()
-                    },
-                    visibility: Visibility { is_visible: false },
-                    ..default()
-                })
-                .insert(PaletteHintText)
-                .insert(PaletteHintTowerType);
+            spawn_text(&asset_server, parent, &["Tower type"], |mut parent| {
+                parent
+                    .insert(PaletteTooltipText)
+                    .insert(PaletteTooltipTowerType);
+            });
 
-            parent
-                .spawn_bundle(TextBundle {
-                    text: Text {
-                        sections: vec![
-                            TextSection {
-                                value: "Cost: ".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                                    font_size: STATUS_FONT_SIZE,
-                                    color: TEXT_COLOR,
-                                },
-                            },
-                            TextSection {
-                                value: "".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                                    font_size: STATUS_FONT_SIZE,
-                                    color: SCORE_COLOR,
-                                },
-                            },
-                        ],
-                        ..default()
-                    },
-                    visibility: Visibility { is_visible: false },
-                    ..default()
-                })
-                .insert(PaletteHintText);
+            spawn_text(&asset_server, parent, &["Cost: ", ""], |mut parent| {
+                parent.insert(PaletteTooltipText);
+            });
         });
 }
 
 fn palette_tooltip_system(
     query_towers: Query<(&Interaction, &TowerPalette), Changed<Interaction>>,
-    mut query_tooltip_visible: Query<&mut Visibility, With<PaletteHintText>>,
+    mut query_tooltip_visible: Query<&mut Visibility, With<PaletteTooltipText>>,
     mut query_tooltip_tower_type: Query<
         &mut Text,
-        (With<PaletteHintText>, With<PaletteHintTowerType>),
+        (With<PaletteTooltipText>, With<PaletteTooltipTowerType>),
     >,
     mut query_tooltip_cost: Query<
         &mut Text,
-        (With<PaletteHintText>, Without<PaletteHintTowerType>),
+        (With<PaletteTooltipText>, Without<PaletteTooltipTowerType>),
     >,
 ) {
     for (interaction, palette) in query_towers.iter() {
@@ -305,6 +275,99 @@ fn palette_tooltip_system(
             Interaction::None => {
                 for mut visibility in query_tooltip_visible.iter_mut() {
                     visibility.is_visible = false;
+                }
+            }
+            _ => (),
+        }
+    }
+}
+
+#[derive(Component)]
+struct TrashcanTooltipText;
+
+fn add_trashcan_hint_panel(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands
+        .spawn_bundle(NodeBundle {
+            style: Style {
+                size: Size::new(Val::Px(PALETTE_SIZE), Val::Auto),
+                margin: Rect::all(Val::Auto),
+                justify_content: JustifyContent::FlexStart,
+                align_items: AlignItems::FlexStart,
+                flex_direction: FlexDirection::ColumnReverse,
+                position_type: PositionType::Absolute,
+                position: Rect {
+                    bottom: Val::Px(PADDING),
+                    right: PADDING_PX,
+                    ..default()
+                },
+                ..default()
+            },
+            color: Color::NONE.into(),
+            ..default()
+        })
+        .with_children(|parent| {
+            add_tower_icon(parent, &asset_server, "trashcan.png", TowerTrashcan)
+        });
+
+    commands
+        .spawn_bundle(NodeBundle {
+            style: Style {
+                // justify_content: JustifyContent::Center,
+                align_items: AlignItems::FlexStart,
+                flex_direction: FlexDirection::Column,
+                position_type: PositionType::Absolute,
+                position: Rect {
+                    bottom: Val::Px(PADDING + PALETTE_SIZE - STATUS_FONT_SIZE),
+                    right: Val::Px(PADDING * 2. + PALETTE_SIZE),
+                    ..default()
+                },
+                ..default()
+            },
+            visibility: Visibility { is_visible: false },
+            color: Color::rgba(0., 0., 0., 0.8).into(),
+            ..default()
+        })
+        .insert(TrashcanTooltipText)
+        .with_children(|parent| {
+            spawn_text(
+                &asset_server,
+                parent,
+                &["Trashcan: drag a tower here to delete"],
+                |mut parent| {
+                    parent.insert(TrashcanTooltipText);
+                },
+            );
+        });
+}
+
+fn trashcan_tooltip_system(
+    query_trashcan: Query<(&Interaction, &Parent), (With<TowerTrashcan>, Changed<Interaction>)>,
+    mut query_tooltip_visible: Query<&mut Visibility, With<TrashcanTooltipText>>,
+    mut query_ui_color: Query<&mut UiColor>,
+    mut selected_tower: ResMut<SelectedTower>,
+) {
+    for (interaction, parent) in query_trashcan.iter() {
+        match *interaction {
+            Interaction::Hovered => {
+                for mut visibility in query_tooltip_visible.iter_mut() {
+                    visibility.is_visible = true;
+                }
+                if let Ok(mut ui_color) = query_ui_color.get_mut(**parent) {
+                    *ui_color = Color::rgba(0.5, 0., 0., 0.5).into();
+                }
+                if selected_tower.tower.is_some() {
+                    selected_tower.hovering_trashcan = true;
+                }
+            }
+            Interaction::None => {
+                for mut visibility in query_tooltip_visible.iter_mut() {
+                    visibility.is_visible = false;
+                }
+                if let Ok(mut ui_color) = query_ui_color.get_mut(**parent) {
+                    *ui_color = Color::rgba(0.0, 0., 0., 0.5).into();
+                }
+                if selected_tower.tower.is_some() {
+                    selected_tower.hovering_trashcan = false;
                 }
             }
             _ => (),

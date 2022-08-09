@@ -2,7 +2,9 @@ use bevy::prelude::*;
 
 use crate::{mouse::SelectedTower, tower::TowerScore, Health};
 
-use super::{BUTTON_HEIGHT, PADDING, PALETTE_SIZE, SCORE_COLOR, STATUS_FONT_SIZE, TEXT_COLOR};
+use super::{
+    spawn_text, BUTTON_HEIGHT, PADDING, PALETTE_SIZE, SCORE_COLOR, STATUS_FONT_SIZE, TEXT_COLOR,
+};
 
 #[derive(Component)]
 pub(super) struct TowerHealthText;
@@ -29,59 +31,13 @@ pub(super) fn add_status_panel(commands: &mut Commands, asset_server: &AssetServ
             ..default()
         })
         .with_children(|parent| {
-            parent
-                .spawn_bundle(TextBundle {
-                    text: Text {
-                        sections: vec![
-                            TextSection {
-                                value: "Health: ".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                                    font_size: STATUS_FONT_SIZE,
-                                    color: TEXT_COLOR,
-                                },
-                            },
-                            TextSection {
-                                value: "".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                                    font_size: STATUS_FONT_SIZE,
-                                    color: SCORE_COLOR,
-                                },
-                            },
-                        ],
-                        ..default()
-                    },
-                    ..default()
-                })
-                .insert(TowerHealthText);
+            spawn_text(asset_server, parent, &["Health: ", ""], |mut parent| {
+                parent.insert(TowerHealthText);
+            });
 
-            parent
-                .spawn_bundle(TextBundle {
-                    text: Text {
-                        sections: vec![
-                            TextSection {
-                                value: "Kills: ".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-                                    font_size: STATUS_FONT_SIZE,
-                                    color: TEXT_COLOR,
-                                },
-                            },
-                            TextSection {
-                                value: "".to_string(),
-                                style: TextStyle {
-                                    font: asset_server.load("fonts/FiraMono-Medium.ttf"),
-                                    font_size: STATUS_FONT_SIZE,
-                                    color: SCORE_COLOR,
-                                },
-                            },
-                        ],
-                        ..default()
-                    },
-                    ..default()
-                })
-                .insert(TowerScoreText);
+            spawn_text(asset_server, parent, &["Kills: ", ""], |mut parent| {
+                parent.insert(TowerScoreText);
+            });
         });
 }
 
