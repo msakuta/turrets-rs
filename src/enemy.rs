@@ -1,6 +1,6 @@
 use crate::{
-    bullet::SHOOT_INTERVAL, mouse::SelectedTower, BulletFilter, BulletShooter, Health, Level,
-    Position, StageClear, Velocity,
+    bullet::SHOOT_INTERVAL, BulletFilter, BulletShooter, Health, Level, Position, StageClear,
+    Velocity,
 };
 use bevy::prelude::*;
 

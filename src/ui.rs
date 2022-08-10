@@ -114,7 +114,7 @@ fn update_progress_bar(level: Res<Level>, mut query: Query<&mut Style, With<Prog
 /// This function assumes the first section of the `text` is a section title, so it has bold style
 /// with different color.
 ///
-/// Additional components can be inserted with the 3rd argument closure. We could return EntityCommands to
+/// Additional components can be inserted with the 4th argument closure. We could return EntityCommands to
 /// the caller to let them insert, but lifetime annotations are too annoying so that I used inner closure
 /// to avoid them.
 fn spawn_text(

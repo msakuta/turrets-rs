@@ -3,7 +3,7 @@ mod healer;
 use self::healer::{heal_target, healer_find_target};
 use crate::{
     bullet::SHOOT_INTERVAL, mouse::tower_not_dragging, BulletFilter, BulletShooter, Enemy, Health,
-    Level, Position, Rotation, Scoreboard, StageClear, Target,
+    Level, Position, Rotation, Scoreboard, Target,
 };
 use bevy::prelude::*;
 
@@ -37,7 +37,6 @@ pub(crate) struct TowerBundle {
     health: Health,
     target: Target,
     bullet_filter: BulletFilter,
-    stage_clear: StageClear,
 }
 
 impl TowerBundle {
@@ -57,7 +56,6 @@ impl TowerBundle {
             health,
             target: Target(None),
             bullet_filter: BulletFilter(false),
-            stage_clear: StageClear,
         }
     }
 }
@@ -109,18 +107,14 @@ const HEALER_HEALTH: Health = Health::new(20.);
 const MISSILE_HEALTH: Health = Health::new(30.);
 
 pub(crate) fn spawn_towers(commands: &mut Commands, asset_server: &Res<AssetServer>) {
-    for i in 0..3 {
+    for i in 0..2 {
         spawn_turret(
             commands,
             asset_server,
-            Vec2::new(i as f32 * 100.0 - 100., 0.0),
-            i as f64 * std::f64::consts::PI / 3.,
+            Vec2::new(i as f32 * 200.0 - 100., 0.0),
+            i as f64 * std::f64::consts::PI * 2. / 3.,
         );
     }
-
-    spawn_shotgun(commands, asset_server, Vec2::new(0.0, -100.0), 0.);
-    spawn_healer(commands, asset_server, Vec2::new(0.0, 100.0), 0.);
-    spawn_missile_tower(commands, asset_server, Vec2::new(100.0, 100.0), 0.);
 }
 
 pub(crate) fn spawn_turret(
@@ -227,7 +221,6 @@ fn health_bar(commands: &mut Commands) -> (Entity, Entity) {
                 ..default()
             })
             .insert(TowerHealthBar)
-            .insert(StageClear)
             .id(),
         commands
             .spawn_bundle(SpriteBundle {
@@ -239,7 +232,6 @@ fn health_bar(commands: &mut Commands) -> (Entity, Entity) {
                 ..default()
             })
             .insert(TowerHealthBar)
-            .insert(StageClear)
             .id(),
     )
 }

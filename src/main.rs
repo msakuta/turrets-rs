@@ -8,7 +8,7 @@ use crate::{
     bullet::{Bullet, BulletPlugin},
     enemy::{enemy_system, spawn_enemies, Enemy},
     mouse::{tower_not_dragging, MousePlugin},
-    tower::{update_health_bar, Timeout, TowerPlugin},
+    tower::{update_health_bar, Timeout, Tower, TowerPlugin},
     ui::UIPlugin,
 };
 use bevy::prelude::*;
@@ -106,7 +106,7 @@ impl Level {
     fn start(difficulty: usize) -> Self {
         Self::Running {
             difficulty,
-            timer: Timer::from_seconds(120., true),
+            timer: Timer::from_seconds(60., true),
         }
     }
 
@@ -180,9 +180,23 @@ fn erase_entities_new_game<T: Component>(
     }
 }
 
-fn reset_game(mut level: ResMut<Level>) {
+fn reset_game(
+    mut commands: Commands,
+    mut level: ResMut<Level>,
+    query: Query<Entity, With<StageClear>>,
+    mut query_towers: Query<&mut Health, With<Tower>>,
+) {
     if level.timer_finished() {
         println!("Round finished!");
+        for entity in query.iter() {
+            commands.entity(entity).despawn();
+        }
+
+        // Restore full health on stage clear
+        for mut tower_health in query_towers.iter_mut() {
+            tower_health.val = tower_health.max;
+        }
+
         *level = Level::Select;
     }
 }

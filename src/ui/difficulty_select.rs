@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 
-use crate::{tower::spawn_towers, Level, Scoreboard, StageClear};
+use crate::{
+    tower::{spawn_towers, Tower},
+    Level, Scoreboard, StageClear,
+};
 
 use super::{quit::HOVERED_BUTTON, StartEvent, SCOREBOARD_FONT_SIZE, TEXT_COLOR};
 
@@ -67,6 +70,7 @@ pub(super) fn difficulty_event_system(
     mut reader: EventReader<StartEvent>,
     mut commands: Commands,
     query: Query<Entity, With<StageClear>>,
+    query_towers: Query<(), With<Tower>>,
     mut level: ResMut<Level>,
     mut scoreboard: ResMut<Scoreboard>,
     asset_server: Res<AssetServer>,
@@ -78,7 +82,11 @@ pub(super) fn difficulty_event_system(
         }
         *level = Level::start(event.0);
         scoreboard.score = 0.;
-        spawn_towers(&mut commands, &asset_server);
+
+        let towers = query_towers.iter().count();
+        if towers == 0 {
+            spawn_towers(&mut commands, &asset_server);
+        }
     }
 }
 
