@@ -2,7 +2,7 @@ mod healer;
 
 use self::healer::{heal_target, healer_find_target};
 use crate::{
-    bullet::{BulletShooter, KilledEvent},
+    bullet::{BulletShooter, GainExpEvent},
     mouse::tower_not_dragging,
     BulletFilter, Enemy, Health, Level, Position, Rotation, Scoreboard, Target,
 };
@@ -340,22 +340,30 @@ fn tower_killed_system(
         &mut TowerLevel,
         &mut Health,
         &mut TowerScore,
-        &mut BulletShooter,
+        Option<&mut BulletShooter>,
+        Option<&mut Healer>,
     )>,
-    mut reader: EventReader<KilledEvent>,
+    mut reader: EventReader<GainExpEvent>,
 ) {
     for event in reader.iter() {
-        if let Ok((mut tower, mut health, mut scoring_tower, mut bullet_shooter)) =
+        if let Ok((mut tower, mut health, mut scoring_tower, mut bullet_shooter, mut healer)) =
             query.get_mut(event.entity)
         {
-            scoring_tower.kills += 1;
+            if event.killed {
+                scoring_tower.kills += 1;
+            }
 
             tower.exp += event.exp;
             while tower_max_exp(tower.level) <= tower.exp {
                 tower.level += 1;
                 health.max = (*tower.max_health)(tower.level);
                 health.val = health.max;
-                bullet_shooter.damage = (1.2f32).powf(tower.level as f32);
+                if let Some(ref mut bullet_shooter) = bullet_shooter {
+                    bullet_shooter.damage = (1.2f32).powf(tower.level as f32);
+                }
+                if let Some(ref mut healer) = healer {
+                    healer.heal_amt = 1. + 0.1 * tower.level as f32;
+                }
             }
         }
     }

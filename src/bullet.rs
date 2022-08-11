@@ -19,9 +19,11 @@ const SHOTGUN_SHOOT_INTERVAL: f32 = 1.5;
 const MISSILE_SHOOT_INTERVAL: f32 = 2.5;
 const BULLET_SPEED: f32 = 500.;
 
-pub(crate) struct KilledEvent {
+pub(crate) struct GainExpEvent {
     pub entity: Entity,
     pub exp: usize,
+    /// True if this event killed an enemy
+    pub killed: bool,
 }
 
 pub(crate) struct BulletPlugin;
@@ -29,7 +31,7 @@ pub(crate) struct BulletPlugin;
 impl Plugin for BulletPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(ShapePlugin);
-        app.add_event::<KilledEvent>();
+        app.add_event::<GainExpEvent>();
         app.add_system_set(
             SystemSet::new()
                 .with_run_criteria(tower_not_dragging)
@@ -182,7 +184,7 @@ pub(crate) fn bullet_collision(
     bullet_query: Query<(Entity, &Transform, &Bullet, Option<&Missile>)>,
     textures: Res<Textures>,
     mut scoreboard: ResMut<Scoreboard>,
-    mut event_writer: EventWriter<KilledEvent>,
+    mut event_writer: EventWriter<GainExpEvent>,
 ) {
     for (bullet_entity, bullet_transform, bullet, missile) in bullet_query.iter() {
         for (entity, transform, health, bullet_filter, tower) in target_query.iter_mut() {
@@ -215,7 +217,7 @@ fn entity_collision(
     entity: Entity,
     transform: &Transform,
     tower: Option<&Tower>,
-    event_writer: &mut EventWriter<KilledEvent>,
+    event_writer: &mut EventWriter<GainExpEvent>,
     mut health: Mut<Health>,
     textures: &Res<Textures>,
     scoreboard: &mut ResMut<Scoreboard>,
@@ -249,9 +251,10 @@ fn entity_collision(
             scoreboard.score += 10.;
             scoreboard.credits += 10.;
 
-            event_writer.send(KilledEvent {
+            event_writer.send(GainExpEvent {
                 entity: bullet.owner,
                 exp: 10,
+                killed: true,
             });
         } else {
             health.val -= bullet.damage;

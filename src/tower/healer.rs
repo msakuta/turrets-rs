@@ -1,19 +1,27 @@
 use super::{Timeout, Tower};
-use crate::{Health, Position, Rotation, Target, Velocity};
+use crate::{bullet::GainExpEvent, Health, Position, Rotation, Target, Velocity};
 use bevy::prelude::*;
-
-#[derive(Component)]
-pub(crate) struct Healer(bool, f32);
-
-impl Healer {
-    pub(crate) fn new() -> Self {
-        Self(false, 2.)
-    }
-}
 
 const HEALER_RANGE: f32 = 300.;
 const HEALER_AMOUNT: f32 = 1.;
 const HEALER_INTERVAL: f32 = 2.;
+
+#[derive(Component)]
+pub(crate) struct Healer {
+    pub enabled: bool,
+    pub cooldown: f32,
+    pub heal_amt: f32,
+}
+
+impl Healer {
+    pub(crate) fn new() -> Self {
+        Self {
+            enabled: false,
+            cooldown: 2.,
+            heal_amt: HEALER_AMOUNT,
+        }
+    }
+}
 
 pub(crate) fn healer_find_target(
     mut query: Query<(Entity, &mut Rotation, &Position, &mut Healer, &mut Target), With<Tower>>,
@@ -52,7 +60,7 @@ pub(crate) fn healer_find_target(
             let delta_angle = target_angle - rotation.0;
             let wrap_angle =
                 ((delta_angle + PI) - ((delta_angle + PI) / TWOPI).floor() * TWOPI) - PI;
-            healer.0 = if wrap_angle.abs() < ANGLE_SPEED {
+            healer.enabled = if wrap_angle.abs() < ANGLE_SPEED {
                 rotation.0 = target_angle;
                 true
             } else if wrap_angle < 0. {
@@ -63,7 +71,7 @@ pub(crate) fn healer_find_target(
                 wrap_angle.abs() < PI / 4.
             };
         } else {
-            healer.0 = false;
+            healer.enabled = false;
         }
     }
 }
@@ -72,24 +80,30 @@ pub(crate) fn heal_target(
     mut commands: Commands,
     time: Res<Time>,
     asset_server: Res<AssetServer>,
-    mut query: Query<(&mut Healer, &Target, &Position)>,
+    mut query: Query<(Entity, &mut Healer, &Target, &Position)>,
     mut target_query: Query<(&Position, &mut Health)>,
+    mut exp_event: EventWriter<GainExpEvent>,
 ) {
     let delta = time.delta_seconds();
-    for (mut healer, target, position) in query.iter_mut() {
-        if !healer.0 {
+    for (entity, mut healer, target, position) in query.iter_mut() {
+        if !healer.enabled {
             continue;
         }
-        if delta < healer.1 {
-            healer.1 -= delta;
+        if delta < healer.cooldown {
+            healer.cooldown -= delta;
             continue;
         }
 
         if let Some(target) = target.0 {
             if let Ok((target_position, mut target)) = target_query.get_mut(target) {
                 if target.val < target.max {
-                    target.val += HEALER_AMOUNT;
-                    healer.1 += HEALER_INTERVAL;
+                    target.val += healer.heal_amt;
+                    healer.cooldown += HEALER_INTERVAL;
+                    exp_event.send(GainExpEvent {
+                        entity,
+                        exp: (3. * healer.heal_amt).ceil() as usize,
+                        killed: false,
+                    });
                     commands
                         .spawn_bundle(SpriteBundle {
                             texture: asset_server.load("heal-effect.png"),
@@ -124,6 +138,6 @@ pub(crate) fn heal_target(
                 }
             }
         }
-        healer.1 = 0.;
+        healer.cooldown = 0.;
     }
 }
