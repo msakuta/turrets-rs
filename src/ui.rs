@@ -14,7 +14,7 @@ use self::{
     quit::{add_quit_button, quit_button_system, quit_event_system, show_quit_button_system},
     scoreboard::{add_scoreboard, update_credits, update_level, update_scoreboard},
     tower_palette::{add_palette_buttons, build_tower_palette},
-    tower_status::{add_status_panel, update_tower_health, update_tower_scoreboard},
+    tower_status::build_tower_status,
 };
 use crate::Level;
 
@@ -29,8 +29,7 @@ impl Plugin for UIPlugin {
         app.add_system(update_level);
         app.add_system(update_scoreboard);
         app.add_system(update_credits);
-        app.add_system(update_tower_scoreboard);
-        app.add_system(update_tower_health);
+        build_tower_status(app);
         build_tower_palette(app);
         app.add_system(quit_event_system);
         app.add_system(quit_button_system);
@@ -95,7 +94,6 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     add_quit_button(&mut commands, &asset_server);
     add_palette_buttons(&mut commands, &asset_server);
     add_difficulty_buttons(&mut commands, &asset_server);
-    add_status_panel(&mut commands, &asset_server);
 }
 
 fn update_progress_bar(level: Res<Level>, mut query: Query<&mut Style, With<ProgressBar>>) {

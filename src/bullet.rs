@@ -4,7 +4,7 @@ use self::missile::{missile_system, Missile, MISSILE_SPEED};
 use crate::{
     mouse::tower_not_dragging,
     sprite_transform_single,
-    tower::{MissileTower, Shotgun, Tower, TowerScore},
+    tower::{MissileTower, Shotgun, Tower},
     BulletFilter, BulletShooter, Explosion, Health, Position, Rotation, Scoreboard, StageClear,
     Target, Textures, Velocity,
 };
@@ -19,11 +19,17 @@ const SHOTGUN_SHOOT_INTERVAL: f32 = 1.5;
 const MISSILE_SHOOT_INTERVAL: f32 = 2.5;
 const BULLET_SPEED: f32 = 500.;
 
+pub(crate) struct KilledEvent {
+    pub entity: Entity,
+    pub exp: usize,
+}
+
 pub(crate) struct BulletPlugin;
 
 impl Plugin for BulletPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugin(ShapePlugin);
+        app.add_event::<KilledEvent>();
         app.add_system_set(
             SystemSet::new()
                 .with_run_criteria(tower_not_dragging)
@@ -157,7 +163,8 @@ pub(crate) fn bullet_collision(
     bullet_query: Query<(Entity, &Transform, &Bullet, Option<&Missile>)>,
     textures: Res<Textures>,
     mut scoreboard: ResMut<Scoreboard>,
-    mut scoring_tower: Query<&mut TowerScore>,
+    mut event_writer: EventWriter<KilledEvent>,
+    // mut scoring_tower: Query<(&mut TowerLevel, &mut Health, &mut TowerScore)>,
 ) {
     for (bullet_entity, bullet_transform, bullet, missile) in bullet_query.iter() {
         for (entity, transform, health, bullet_filter, tower) in target_query.iter_mut() {
@@ -171,7 +178,7 @@ pub(crate) fn bullet_collision(
                     entity,
                     transform,
                     tower,
-                    &mut scoring_tower,
+                    &mut event_writer,
                     health,
                     &textures,
                     &mut scoreboard,
@@ -190,7 +197,7 @@ fn entity_collision(
     entity: Entity,
     transform: &Transform,
     tower: Option<&Tower>,
-    scoring_tower: &mut Query<&mut TowerScore>,
+    event_writer: &mut EventWriter<KilledEvent>,
     mut health: Mut<Health>,
     textures: &Res<Textures>,
     scoreboard: &mut ResMut<Scoreboard>,
@@ -224,11 +231,10 @@ fn entity_collision(
             scoreboard.score += 10.;
             scoreboard.credits += 10.;
 
-            if let Ok(mut scoring_tower) =
-                scoring_tower.get_component_mut::<TowerScore>(bullet.owner)
-            {
-                scoring_tower.kills += 1;
-            }
+            event_writer.send(KilledEvent {
+                entity: bullet.owner,
+                exp: 10,
+            });
         } else {
             health.val -= 1.;
         }

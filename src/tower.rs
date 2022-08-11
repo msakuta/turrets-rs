@@ -2,8 +2,9 @@ mod healer;
 
 use self::healer::{heal_target, healer_find_target};
 use crate::{
-    bullet::SHOOT_INTERVAL, mouse::tower_not_dragging, BulletFilter, BulletShooter, Enemy, Health,
-    Level, Position, Rotation, Scoreboard, Target,
+    bullet::{KilledEvent, SHOOT_INTERVAL},
+    mouse::tower_not_dragging,
+    BulletFilter, BulletShooter, Enemy, Health, Level, Position, Rotation, Scoreboard, Target,
 };
 use bevy::prelude::*;
 
@@ -12,6 +13,13 @@ pub(crate) use healer::Healer;
 #[derive(Component)]
 pub(crate) struct Tower {
     pub health_bar: (Entity, Entity),
+}
+
+#[derive(Component)]
+pub(crate) struct TowerLevel {
+    pub level: usize,
+    pub exp: usize,
+    pub max_health: &'static (dyn Fn(usize) -> f32 + Send + Sync),
 }
 
 #[derive(Component)]
@@ -33,6 +41,7 @@ pub(crate) struct TowerBundle {
     position: Position,
     rotation: Rotation,
     tower: Tower,
+    tower_level: TowerLevel,
     tower_score: TowerScore,
     health: Health,
     target: Target,
@@ -51,6 +60,11 @@ impl TowerBundle {
             rotation,
             tower: Tower {
                 health_bar: health_bar(commands),
+            },
+            tower_level: TowerLevel {
+                level: 0,
+                exp: 0,
+                max_health: &|level| ((1.2f32).powf(level as f32) * 10.).ceil(),
             },
             tower_score: TowerScore { kills: 0 },
             health,
@@ -82,6 +96,7 @@ impl Plugin for TowerPlugin {
                 .with_system(timeout)
                 .with_system(spawn_towers_new_game),
         );
+        app.add_system(tower_killed_system);
     }
 }
 
@@ -318,6 +333,28 @@ fn timeout(
         timeout.0 -= delta;
         if timeout.0 < 1. {
             sprite.color = Color::rgba(1., 1., 1., timeout.0);
+        }
+    }
+}
+
+pub(crate) fn tower_max_exp(level: usize) -> usize {
+    ((1.5f64).powf(level as f64) * 100.).ceil() as usize
+}
+
+fn tower_killed_system(
+    mut query: Query<(&mut TowerLevel, &mut Health, &mut TowerScore)>,
+    mut reader: EventReader<KilledEvent>,
+) {
+    for event in reader.iter() {
+        if let Ok((mut tower, mut health, mut scoring_tower)) = query.get_mut(event.entity) {
+            scoring_tower.kills += 1;
+
+            tower.exp += event.exp;
+            while tower_max_exp(tower.level) <= tower.exp {
+                tower.level += 1;
+                health.max = (*tower.max_health)(tower.level);
+                health.val = health.max;
+            }
         }
     }
 }
