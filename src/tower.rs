@@ -2,9 +2,9 @@ mod healer;
 
 use self::healer::{heal_target, healer_find_target};
 use crate::{
-    bullet::{KilledEvent, SHOOT_INTERVAL},
+    bullet::{BulletShooter, KilledEvent},
     mouse::tower_not_dragging,
-    BulletFilter, BulletShooter, Enemy, Health, Level, Position, Rotation, Scoreboard, Target,
+    BulletFilter, Enemy, Health, Level, Position, Rotation, Scoreboard, Target,
 };
 use bevy::prelude::*;
 
@@ -71,12 +71,6 @@ impl TowerBundle {
             target: Target(None),
             bullet_filter: BulletFilter(false),
         }
-    }
-}
-
-impl BulletShooter {
-    pub(crate) fn new() -> Self {
-        BulletShooter(false, rand::random::<f32>() * SHOOT_INTERVAL)
     }
 }
 
@@ -150,7 +144,7 @@ pub(crate) fn spawn_turret(
             ..default()
         })
         .insert_bundle(tower)
-        .insert(BulletShooter::new())
+        .insert(BulletShooter::new(false, 1.))
         .id()
 }
 
@@ -172,7 +166,7 @@ pub(crate) fn spawn_shotgun(
             ..default()
         })
         .insert_bundle(tower)
-        .insert(BulletShooter::new())
+        .insert(BulletShooter::new(false, 1.))
         .insert(Shotgun)
         .id()
 }
@@ -217,7 +211,7 @@ pub(crate) fn spawn_missile_tower(
             ..default()
         })
         .insert_bundle(tower)
-        .insert(BulletShooter::new())
+        .insert(BulletShooter::new(false, 1.))
         .insert(MissileTower)
         .id()
 }
@@ -303,7 +297,7 @@ fn tower_find_target(
             let delta_angle = target_angle - rotation.0;
             let wrap_angle =
                 ((delta_angle + PI) - ((delta_angle + PI) / TWOPI).floor() * TWOPI) - PI;
-            bullet_shooter.0 = if wrap_angle.abs() < ANGLE_SPEED {
+            bullet_shooter.enabled = if wrap_angle.abs() < ANGLE_SPEED {
                 rotation.0 = target_angle;
                 true
             } else if wrap_angle < 0. {
@@ -314,7 +308,7 @@ fn tower_find_target(
                 wrap_angle.abs() < PI / 4.
             };
         } else {
-            bullet_shooter.0 = false;
+            bullet_shooter.enabled = false;
         }
     }
 }
@@ -342,11 +336,18 @@ pub(crate) fn tower_max_exp(level: usize) -> usize {
 }
 
 fn tower_killed_system(
-    mut query: Query<(&mut TowerLevel, &mut Health, &mut TowerScore)>,
+    mut query: Query<(
+        &mut TowerLevel,
+        &mut Health,
+        &mut TowerScore,
+        &mut BulletShooter,
+    )>,
     mut reader: EventReader<KilledEvent>,
 ) {
     for event in reader.iter() {
-        if let Ok((mut tower, mut health, mut scoring_tower)) = query.get_mut(event.entity) {
+        if let Ok((mut tower, mut health, mut scoring_tower, mut bullet_shooter)) =
+            query.get_mut(event.entity)
+        {
             scoring_tower.kills += 1;
 
             tower.exp += event.exp;
@@ -354,6 +355,7 @@ fn tower_killed_system(
                 tower.level += 1;
                 health.max = (*tower.max_health)(tower.level);
                 health.val = health.max;
+                bullet_shooter.damage = (1.2f32).powf(tower.level as f32);
             }
         }
     }

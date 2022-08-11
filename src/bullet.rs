@@ -5,8 +5,8 @@ use crate::{
     mouse::tower_not_dragging,
     sprite_transform_single,
     tower::{MissileTower, Shotgun, Tower},
-    BulletFilter, BulletShooter, Explosion, Health, Position, Rotation, Scoreboard, StageClear,
-    Target, Textures, Velocity,
+    BulletFilter, Explosion, Health, Position, Rotation, Scoreboard, StageClear, Target, Textures,
+    Velocity,
 };
 use bevy::{prelude::*, sprite::collide_aabb::collide};
 use bevy_prototype_lyon::prelude::*;
@@ -42,9 +42,27 @@ impl Plugin for BulletPlugin {
 }
 
 #[derive(Component)]
+pub(crate) struct BulletShooter {
+    pub enabled: bool,
+    pub cooldown: f32,
+    pub damage: f32,
+}
+
+impl BulletShooter {
+    pub(crate) fn new(enabled: bool, damage: f32) -> Self {
+        Self {
+            enabled,
+            cooldown: 0.,
+            damage,
+        }
+    }
+}
+
+#[derive(Component)]
 pub(crate) struct Bullet {
     filter: bool,
     owner: Entity,
+    damage: f32,
 }
 
 pub(crate) fn shoot_bullet(
@@ -65,10 +83,10 @@ pub(crate) fn shoot_bullet(
     for (entity, position, rotation, mut bullet_shooter, shotgun, missile_tower, target) in
         query.iter_mut()
     {
-        if !bullet_shooter.0 {
+        if !bullet_shooter.enabled {
             continue;
         }
-        if bullet_shooter.1 < delta {
+        if bullet_shooter.cooldown < delta {
             let mut shoot =
                 |file, angle: f64, speed: f32, horz_offset: f32, target: Option<Entity>| {
                     let bullet_rotation = Rotation(angle);
@@ -97,6 +115,7 @@ pub(crate) fn shoot_bullet(
                     builder.insert(Bullet {
                         filter: rotation.is_some(),
                         owner: entity,
+                        damage: bullet_shooter.damage,
                     });
                     builder.insert(StageClear);
                     if let Some((target, trail)) = target.zip(trail) {
@@ -115,7 +134,7 @@ pub(crate) fn shoot_bullet(
                             None,
                         );
                     }
-                    bullet_shooter.1 += SHOTGUN_SHOOT_INTERVAL;
+                    bullet_shooter.cooldown += SHOTGUN_SHOOT_INTERVAL;
                 } else if missile_tower.is_some() {
                     if let Some(target) = target.and_then(|target| target.0) {
                         for i in -2..=2 {
@@ -130,11 +149,11 @@ pub(crate) fn shoot_bullet(
                                 Some(target),
                             );
                         }
-                        bullet_shooter.1 += MISSILE_SHOOT_INTERVAL;
+                        bullet_shooter.cooldown += MISSILE_SHOOT_INTERVAL;
                     }
                 } else {
                     shoot("bullet.png", rotation.0, BULLET_SPEED, 0., None);
-                    bullet_shooter.1 += SHOOT_INTERVAL;
+                    bullet_shooter.cooldown += SHOOT_INTERVAL;
                 }
             } else {
                 shoot(
@@ -144,10 +163,10 @@ pub(crate) fn shoot_bullet(
                     0.,
                     None,
                 );
-                bullet_shooter.1 += SHOOT_INTERVAL * rand::random::<f32>();
+                bullet_shooter.cooldown += SHOOT_INTERVAL * rand::random::<f32>();
             }
         }
-        bullet_shooter.1 -= delta;
+        bullet_shooter.cooldown -= delta;
     }
 }
 
@@ -164,7 +183,6 @@ pub(crate) fn bullet_collision(
     textures: Res<Textures>,
     mut scoreboard: ResMut<Scoreboard>,
     mut event_writer: EventWriter<KilledEvent>,
-    // mut scoring_tower: Query<(&mut TowerLevel, &mut Health, &mut TowerScore)>,
 ) {
     for (bullet_entity, bullet_transform, bullet, missile) in bullet_query.iter() {
         for (entity, transform, health, bullet_filter, tower) in target_query.iter_mut() {
@@ -236,7 +254,7 @@ fn entity_collision(
                 exp: 10,
             });
         } else {
-            health.val -= 1.;
+            health.val -= bullet.damage;
         }
 
         commands

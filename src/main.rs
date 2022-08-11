@@ -54,9 +54,6 @@ struct Rotation(f64);
 struct Velocity(Vec2);
 
 #[derive(Component)]
-struct BulletShooter(bool, f32);
-
-#[derive(Component)]
 struct Target(Option<Entity>);
 
 #[derive(Component)]

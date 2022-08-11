@@ -1,7 +1,4 @@
-use crate::{
-    bullet::SHOOT_INTERVAL, BulletFilter, BulletShooter, Health, Level, Position, StageClear,
-    Velocity,
-};
+use crate::{bullet::BulletShooter, BulletFilter, Health, Level, Position, StageClear, Velocity};
 use bevy::prelude::*;
 
 #[derive(Component)]
@@ -66,7 +63,7 @@ pub(crate) fn spawn_enemies(
             ))
             .insert(Enemy)
             .insert(Health::new(3.))
-            .insert(BulletShooter(true, SHOOT_INTERVAL))
+            .insert(BulletShooter::new(true, 1.))
             .insert(BulletFilter(true))
             .insert(StageClear);
     }

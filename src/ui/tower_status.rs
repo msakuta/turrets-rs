@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::{
+    bullet::BulletShooter,
     mouse::SelectedTower,
     tower::{tower_max_exp, TowerLevel, TowerScore},
     Health,
@@ -20,12 +21,16 @@ struct TowerLevelText;
 #[derive(Component)]
 struct TowerExpText;
 
+#[derive(Component)]
+struct TowerShooterText;
+
 pub(super) fn build_tower_status(app: &mut App) {
     app.add_startup_system(add_status_panel);
     app.add_system(update_tower_scoreboard);
     app.add_system(update_tower_health);
     app.add_system(update_tower_level);
     app.add_system(update_tower_experience);
+    app.add_system(update_tower_damage);
 }
 
 fn add_status_panel(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -34,7 +39,7 @@ fn add_status_panel(mut commands: Commands, asset_server: Res<AssetServer>) {
             style: Style {
                 // justify_content: JustifyContent::Center,
                 align_items: AlignItems::FlexStart,
-                flex_direction: FlexDirection::Column,
+                flex_direction: FlexDirection::ColumnReverse,
                 position_type: PositionType::Absolute,
                 position: Rect {
                     top: Val::Px(PADDING * 2. + BUTTON_HEIGHT),
@@ -62,6 +67,10 @@ fn add_status_panel(mut commands: Commands, asset_server: Res<AssetServer>) {
 
             spawn_text(&asset_server, parent, &["Exp: ", ""], |mut parent| {
                 parent.insert(TowerExpText);
+            });
+
+            spawn_text(&asset_server, parent, &["Damage: ", ""], |mut parent| {
+                parent.insert(TowerShooterText);
             });
         });
 }
@@ -133,6 +142,24 @@ fn update_tower_experience(
         {
             text.sections[1].value =
                 format!("{}/{}", tower_level.exp, tower_max_exp(tower_level.level));
+        } else {
+            text.sections[1].value = "".to_string();
+        }
+    }
+}
+
+fn update_tower_damage(
+    selected_tower: Res<SelectedTower>,
+    tower_shooter_query: Query<&BulletShooter>,
+    mut text_query: Query<&mut Text, With<TowerShooterText>>,
+) {
+    if let Ok(mut text) = text_query.get_single_mut() {
+        if let Some(tower_shooter) = selected_tower
+            .as_ref()
+            .as_ref()
+            .and_then(|tower| tower_shooter_query.get(tower.tower).ok())
+        {
+            text.sections[1].value = format!("{}", tower_shooter.damage);
         } else {
             text.sections[1].value = "".to_string();
         }

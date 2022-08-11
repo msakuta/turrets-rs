@@ -14,7 +14,7 @@ use super::{
 use std::iter::Iterator;
 
 pub(super) fn build_tower_palette(app: &mut App) {
-    app.add_startup_system(add_palette_hint_panel);
+    app.add_startup_system(add_palette_tooltip_panel);
     app.add_startup_system(add_trashcan_hint_panel);
     app.add_system(palette_mouse_system);
     app.add_system(update_palette_system);
@@ -223,7 +223,7 @@ struct PaletteTooltipText;
 #[derive(Component)]
 struct PaletteTooltipTowerType;
 
-fn add_palette_hint_panel(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn add_palette_tooltip_panel(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
         .spawn_bundle(NodeBundle {
             style: Style {
@@ -232,7 +232,7 @@ fn add_palette_hint_panel(mut commands: Commands, asset_server: Res<AssetServer>
                 flex_direction: FlexDirection::Column,
                 position_type: PositionType::Absolute,
                 position: Rect {
-                    top: Val::Px(PADDING * 4. + BUTTON_HEIGHT + STATUS_FONT_SIZE * 2.),
+                    top: Val::Px(PADDING * 4. + BUTTON_HEIGHT + STATUS_FONT_SIZE * 6.),
                     right: Val::Px(PADDING * 2. + PALETTE_SIZE),
                     ..default()
                 },
