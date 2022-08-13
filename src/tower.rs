@@ -7,7 +7,7 @@ use crate::{
     BulletFilter, Enemy, Health, Position, Rotation, Target,
 };
 use ::serde::{Deserialize, Serialize};
-use bevy::{ecs::bundle, prelude::*};
+use bevy::prelude::*;
 
 pub(crate) use healer::Healer;
 
@@ -66,7 +66,7 @@ impl TowerBundle {
             tower_level: bundle.tower_level.unwrap_or(TowerLevel {
                 level: 0,
                 exp: 0,
-                max_health_base: 10., //&|level| ((1.2f32).powf(level as f32) * 10.).ceil(),
+                max_health_base: 10.,
                 max_health_exponent: 1.2,
             }),
             tower_score: bundle.tower_score.unwrap_or(TowerScore { kills: 0 }),
@@ -370,8 +370,9 @@ fn tower_killed_system(
             tower.exp += event.exp;
             while tower_max_exp(tower.level) <= tower.exp {
                 tower.level += 1;
-                health.max =
-                    tower.max_health_exponent.powf(tower.level as f32) * tower.max_health_base;
+                health.max = (tower.max_health_exponent.powf(tower.level as f32)
+                    * tower.max_health_base)
+                    .ceil();
                 health.val = health.max;
                 if let Some(ref mut bullet_shooter) = bullet_shooter {
                     bullet_shooter.damage = (1.2f32).powf(tower.level as f32);

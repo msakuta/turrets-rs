@@ -104,7 +104,7 @@ fn update_tower_health(
             .as_ref()
             .and_then(|tower| tower_health_query.get(tower.tower).ok())
         {
-            text.sections[1].value = format!("{:.0}/{}", health.val, health.max);
+            text.sections[1].value = format!("{:.0}/{:.0}", health.val, health.max);
         } else {
             text.sections[1].value = "".to_string();
         }
