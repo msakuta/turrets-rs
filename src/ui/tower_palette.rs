@@ -38,10 +38,12 @@ impl TowerPalette {
         position: Vec2,
     ) -> Entity {
         match self {
-            Self::Turret => spawn_turret(commands, asset_server, position, 0.),
-            Self::Shotgun => spawn_shotgun(commands, asset_server, position, 0.),
-            Self::Healer => spawn_healer(commands, asset_server, position, 0.),
-            Self::MissileTower => spawn_missile_tower(commands, asset_server, position, 0.),
+            Self::Turret => spawn_turret(commands, asset_server, position, 0., default()),
+            Self::Shotgun => spawn_shotgun(commands, asset_server, position, 0., default()),
+            Self::Healer => spawn_healer(commands, asset_server, position, 0., default()),
+            Self::MissileTower => {
+                spawn_missile_tower(commands, asset_server, position, 0., default())
+            }
         }
     }
 

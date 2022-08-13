@@ -4,33 +4,35 @@ use self::healer::{heal_target, healer_find_target};
 use crate::{
     bullet::{BulletShooter, GainExpEvent},
     mouse::tower_not_dragging,
-    BulletFilter, Enemy, Health, Level, Position, Rotation, Scoreboard, Target,
+    BulletFilter, Enemy, Health, Position, Rotation, Target,
 };
-use bevy::prelude::*;
+use ::serde::{Deserialize, Serialize};
+use bevy::{ecs::bundle, prelude::*};
 
 pub(crate) use healer::Healer;
 
-#[derive(Component)]
+#[derive(Component, Serialize, Deserialize)]
 pub(crate) struct Tower {
     pub health_bar: (Entity, Entity),
 }
 
-#[derive(Component)]
+#[derive(Component, Serialize, Deserialize)]
 pub(crate) struct TowerLevel {
     pub level: usize,
     pub exp: usize,
-    pub max_health: &'static (dyn Fn(usize) -> f32 + Send + Sync),
+    pub max_health_base: f32,
+    pub max_health_exponent: f32,
 }
 
-#[derive(Component)]
+#[derive(Component, Serialize, Deserialize)]
 pub(crate) struct TowerScore {
     pub kills: usize,
 }
 
-#[derive(Component)]
+#[derive(Component, Serialize, Deserialize)]
 pub(crate) struct Shotgun;
 
-#[derive(Component)]
+#[derive(Component, Serialize, Deserialize)]
 pub(crate) struct MissileTower;
 
 #[derive(Component)]
@@ -53,7 +55,7 @@ impl TowerBundle {
         commands: &mut Commands,
         position: Position,
         rotation: Rotation,
-        health: Health,
+        bundle: TowerInitBundle,
     ) -> Self {
         Self {
             position,
@@ -61,13 +63,14 @@ impl TowerBundle {
             tower: Tower {
                 health_bar: health_bar(commands),
             },
-            tower_level: TowerLevel {
+            tower_level: bundle.tower_level.unwrap_or(TowerLevel {
                 level: 0,
                 exp: 0,
-                max_health: &|level| ((1.2f32).powf(level as f32) * 10.).ceil(),
-            },
-            tower_score: TowerScore { kills: 0 },
-            health,
+                max_health_base: 10., //&|level| ((1.2f32).powf(level as f32) * 10.).ceil(),
+                max_health_exponent: 1.2,
+            }),
+            tower_score: bundle.tower_score.unwrap_or(TowerScore { kills: 0 }),
+            health: bundle.health.unwrap(),
             target: Target(None),
             bullet_filter: BulletFilter {
                 filter: false,
@@ -91,26 +94,9 @@ impl Plugin for TowerPlugin {
                 .with_system(tower_find_target)
                 .with_system(healer_find_target)
                 .with_system(heal_target)
-                .with_system(timeout)
-                .with_system(spawn_towers_new_game),
+                .with_system(timeout),
         );
         app.add_system(tower_killed_system);
-    }
-}
-
-fn spawn_towers_new_game(
-    mut commands: Commands,
-    level: Res<Level>,
-    query: Query<&Tower>,
-    mut scoreboard: ResMut<Scoreboard>,
-    asset_server: Res<AssetServer>,
-) {
-    if level.timer_finished() {
-        println!("Round finished!");
-        if query.iter().next().is_none() {
-            spawn_towers(&mut commands, &asset_server);
-            scoreboard.score = 0.;
-        }
     }
 }
 
@@ -126,8 +112,16 @@ pub(crate) fn spawn_towers(commands: &mut Commands, asset_server: &Res<AssetServ
             asset_server,
             Vec2::new(i as f32 * 200.0 - 100., 0.0),
             i as f64 * std::f64::consts::PI * 2. / 3.,
+            default(),
         );
     }
+}
+
+#[derive(Default)]
+pub(crate) struct TowerInitBundle {
+    pub tower_level: Option<TowerLevel>,
+    pub tower_score: Option<TowerScore>,
+    pub health: Option<Health>,
 }
 
 pub(crate) fn spawn_turret(
@@ -135,12 +129,16 @@ pub(crate) fn spawn_turret(
     asset_server: &AssetServer,
     position: Vec2,
     rotation: f64,
+    bundle: TowerInitBundle,
 ) -> Entity {
     let tower = TowerBundle::new(
         commands,
         Position(position),
         Rotation(rotation),
-        TOWER_HEALTH,
+        TowerInitBundle {
+            health: Some(bundle.health.unwrap_or(TOWER_HEALTH)),
+            ..bundle
+        },
     );
     commands
         .spawn_bundle(SpriteBundle {
@@ -157,12 +155,16 @@ pub(crate) fn spawn_shotgun(
     asset_server: &AssetServer,
     position: Vec2,
     rotation: f64,
+    bundle: TowerInitBundle,
 ) -> Entity {
     let tower = TowerBundle::new(
         commands,
         Position(position),
         Rotation(rotation),
-        SHOTGUN_HEALTH,
+        TowerInitBundle {
+            health: Some(bundle.health.unwrap_or(SHOTGUN_HEALTH)),
+            ..bundle
+        },
     );
     commands
         .spawn_bundle(SpriteBundle {
@@ -180,12 +182,16 @@ pub(crate) fn spawn_healer(
     asset_server: &AssetServer,
     position: Vec2,
     rotation: f64,
+    bundle: TowerInitBundle,
 ) -> Entity {
     let tower = TowerBundle::new(
         commands,
         Position(position),
         Rotation(rotation),
-        HEALER_HEALTH,
+        TowerInitBundle {
+            health: Some(bundle.health.unwrap_or(HEALER_HEALTH)),
+            ..bundle
+        },
     );
     commands
         .spawn_bundle(SpriteBundle {
@@ -202,12 +208,16 @@ pub(crate) fn spawn_missile_tower(
     asset_server: &AssetServer,
     position: Vec2,
     rotation: f64,
+    bundle: TowerInitBundle,
 ) -> Entity {
     let tower = TowerBundle::new(
         commands,
         Position(position),
         Rotation(rotation),
-        MISSILE_HEALTH,
+        TowerInitBundle {
+            health: Some(bundle.health.unwrap_or(MISSILE_HEALTH)),
+            ..bundle
+        },
     );
     commands
         .spawn_bundle(SpriteBundle {
@@ -360,7 +370,8 @@ fn tower_killed_system(
             tower.exp += event.exp;
             while tower_max_exp(tower.level) <= tower.exp {
                 tower.level += 1;
-                health.max = (*tower.max_health)(tower.level);
+                health.max =
+                    tower.max_health_exponent.powf(tower.level as f32) * tower.max_health_base;
                 health.val = health.max;
                 if let Some(ref mut bullet_shooter) = bullet_shooter {
                     bullet_shooter.damage = (1.2f32).powf(tower.level as f32);

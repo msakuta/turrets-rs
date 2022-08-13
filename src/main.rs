@@ -1,6 +1,7 @@
 mod bullet;
 mod enemy;
 mod mouse;
+mod save;
 mod tower;
 mod ui;
 
@@ -8,14 +9,18 @@ use crate::{
     bullet::{Bullet, BulletPlugin},
     enemy::{enemy_system, spawn_enemies, Enemy},
     mouse::{tower_not_dragging, MousePlugin},
-    tower::{update_health_bar, Timeout, Tower, TowerPlugin},
+    save::SaveGameEvent,
+    tower::{spawn_towers, update_health_bar, Timeout, Tower, TowerPlugin},
     ui::UIPlugin,
 };
 use bevy::prelude::*;
+use save::{load_game, save_game};
+use serde::{Deserialize, Serialize};
 
 fn main() {
     App::new()
         .add_event::<ClearEvent>()
+        .add_event::<SaveGameEvent>()
         .insert_resource(ClearColor(Color::rgb(0.1, 0.1, 0.2)))
         .add_plugins(DefaultPlugins)
         .add_plugin(UIPlugin)
@@ -37,6 +42,7 @@ fn main() {
         )
         .add_system(sprite_transform)
         .add_system(update_health_bar)
+        .add_system(save_game)
         .run();
 }
 
@@ -44,10 +50,10 @@ fn main() {
 #[derive(Component)]
 struct StageClear;
 
-#[derive(Component, Clone, Copy, Debug)]
+#[derive(Component, Clone, Copy, Debug, Serialize, Deserialize)]
 struct Position(Vec2);
 
-#[derive(Component, Clone, Copy, Debug)]
+#[derive(Component, Clone, Copy, Debug, Serialize, Deserialize)]
 struct Rotation(f64);
 
 #[derive(Component, Clone, Copy, Debug, Deref, DerefMut)]
@@ -63,7 +69,7 @@ struct BulletFilter {
     exp: usize,
 }
 
-#[derive(Component)]
+#[derive(Component, Serialize, Deserialize)]
 struct Health {
     val: f32,
     max: f32,
@@ -84,6 +90,7 @@ struct Textures {
     large_explosion: Handle<TextureAtlas>,
 }
 
+#[derive(Serialize, Deserialize)]
 struct Scoreboard {
     score: f64,
     credits: f64,
@@ -150,7 +157,11 @@ fn setup(
         small_explosion: gen_texture_handle("explode.png", 16., 8),
         large_explosion: gen_texture_handle("explode2.png", 32., 6),
     });
-    commands.insert_resource(Scoreboard::default());
+
+    let mut scoreboard = Scoreboard::default();
+    load_game(&mut commands, &asset_server, &mut scoreboard);
+
+    commands.insert_resource(scoreboard);
     commands.insert_resource(Level::Select);
     commands.spawn_bundle(OrthographicCameraBundle::new_2d());
 
@@ -194,6 +205,9 @@ fn reset_game(
     mut level: ResMut<Level>,
     query: Query<Entity, With<StageClear>>,
     mut query_towers: Query<&mut Health, With<Tower>>,
+    mut writer: EventWriter<SaveGameEvent>,
+    mut scoreboard: ResMut<Scoreboard>,
+    asset_server: Res<AssetServer>,
 ) {
     if level.timer_finished() {
         println!("Round finished!");
@@ -202,11 +216,20 @@ fn reset_game(
         }
 
         // Restore full health on stage clear
+        let mut any_tower = false;
         for mut tower_health in query_towers.iter_mut() {
             tower_health.val = tower_health.max;
+            any_tower = true;
+        }
+
+        if !any_tower {
+            spawn_towers(&mut commands, &asset_server);
+            scoreboard.score = 0.;
         }
 
         *level = Level::Select;
+
+        writer.send(SaveGameEvent);
     }
 }
 
