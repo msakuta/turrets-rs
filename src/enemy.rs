@@ -1,4 +1,7 @@
-use crate::{bullet::BulletShooter, BulletFilter, Health, Level, Position, StageClear, Velocity};
+use crate::{
+    bullet::{BulletShooter, ENEMY_SIZE},
+    BulletFilter, Health, Level, Position, StageClear, Velocity,
+};
 use bevy::prelude::*;
 
 #[derive(Component)]
@@ -52,9 +55,11 @@ pub(crate) fn spawn_enemies(
             std::mem::swap(&mut x, &mut y);
         }
 
+        let boss = 0 < level.difficulty() && rand::random::<f64>() < 0.1f64;
+
         commands
             .spawn_bundle(SpriteBundle {
-                texture: asset_server.load("enemy.png"),
+                texture: asset_server.load(if boss { "boss.png" } else { "enemy.png" }),
                 ..default()
             })
             .insert(Position(Vec2::new(x, y)))
@@ -62,9 +67,12 @@ pub(crate) fn spawn_enemies(
                 10. * Vec2::new(rand::random::<f32>() - 0.5, rand::random::<f32>() - 0.5),
             ))
             .insert(Enemy)
-            .insert(Health::new(3.))
+            .insert(Health::new(if boss { 150. } else { 10. }))
             .insert(BulletShooter::new(true, 1.))
-            .insert(BulletFilter(true))
+            .insert(BulletFilter {
+                filter: true,
+                radius: if boss { ENEMY_SIZE * 2. } else { ENEMY_SIZE },
+            })
             .insert(StageClear);
     }
 }

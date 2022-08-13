@@ -69,7 +69,10 @@ impl TowerBundle {
             tower_score: TowerScore { kills: 0 },
             health,
             target: Target(None),
-            bullet_filter: BulletFilter(false),
+            bullet_filter: BulletFilter {
+                filter: false,
+                radius: 10.,
+            },
         }
     }
 }

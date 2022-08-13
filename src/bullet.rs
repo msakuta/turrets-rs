@@ -11,11 +11,11 @@ use crate::{
 use bevy::{prelude::*, sprite::collide_aabb::collide};
 use bevy_prototype_lyon::prelude::*;
 
-const ENEMY_SIZE: f32 = 20.;
+pub(crate) const ENEMY_SIZE: f32 = 20.;
 const BULLET_SIZE: f32 = 20.;
 
-pub(crate) const SHOOT_INTERVAL: f32 = 0.5;
-const SHOTGUN_SHOOT_INTERVAL: f32 = 1.5;
+pub(crate) const SHOOT_INTERVAL: f32 = 0.25;
+const SHOTGUN_SHOOT_INTERVAL: f32 = 0.75;
 const MISSILE_SHOOT_INTERVAL: f32 = 2.5;
 const BULLET_SPEED: f32 = 500.;
 
@@ -36,7 +36,7 @@ impl Plugin for BulletPlugin {
             SystemSet::new()
                 .with_run_criteria(tower_not_dragging)
                 .with_system(shoot_bullet)
-                .with_system(bullet_collision)
+                .with_system(bullet_collision_system)
                 .with_system(missile_system),
         );
         app.add_system(cleanup);
@@ -165,14 +165,14 @@ pub(crate) fn shoot_bullet(
                     0.,
                     None,
                 );
-                bullet_shooter.cooldown += SHOOT_INTERVAL * rand::random::<f32>();
+                bullet_shooter.cooldown += SHOOT_INTERVAL * rand::random::<f32>() * 2.;
             }
         }
         bullet_shooter.cooldown -= delta;
     }
 }
 
-pub(crate) fn bullet_collision(
+pub(crate) fn bullet_collision_system(
     mut commands: Commands,
     mut target_query: Query<(
         Entity,
@@ -188,12 +188,13 @@ pub(crate) fn bullet_collision(
 ) {
     for (bullet_entity, bullet_transform, bullet, missile) in bullet_query.iter() {
         for (entity, transform, health, bullet_filter, tower) in target_query.iter_mut() {
-            if bullet.filter == bullet_filter.0 {
-                entity_collision(
+            if bullet.filter == bullet_filter.filter {
+                single_collision(
                     &mut commands,
                     bullet_entity,
                     bullet,
                     bullet_transform,
+                    bullet_filter,
                     missile,
                     entity,
                     transform,
@@ -208,11 +209,12 @@ pub(crate) fn bullet_collision(
     }
 }
 
-fn entity_collision(
+fn single_collision(
     commands: &mut Commands,
     bullet_entity: Entity,
     bullet: &Bullet,
     bullet_transform: &Transform,
+    bullet_filter: &BulletFilter,
     missile: Option<&Missile>,
     entity: Entity,
     transform: &Transform,
@@ -226,7 +228,7 @@ fn entity_collision(
         bullet_transform.translation,
         Vec2::new(BULLET_SIZE, BULLET_SIZE),
         transform.translation,
-        Vec2::new(ENEMY_SIZE, ENEMY_SIZE),
+        Vec2::new(bullet_filter.radius, bullet_filter.radius),
     );
 
     if collision.is_some() {

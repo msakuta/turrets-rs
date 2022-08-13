@@ -57,7 +57,10 @@ struct Velocity(Vec2);
 struct Target(Option<Entity>);
 
 #[derive(Component)]
-struct BulletFilter(bool);
+struct BulletFilter {
+    filter: bool,
+    radius: f32,
+}
 
 #[derive(Component)]
 struct Health {
@@ -119,6 +122,14 @@ impl Level {
             true
         } else {
             false
+        }
+    }
+
+    fn difficulty(&self) -> usize {
+        if let Self::Running { difficulty, .. } = self {
+            *difficulty
+        } else {
+            0
         }
     }
 }
