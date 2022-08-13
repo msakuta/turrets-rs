@@ -60,6 +60,7 @@ struct Target(Option<Entity>);
 struct BulletFilter {
     filter: bool,
     radius: f32,
+    exp: usize,
 }
 
 #[derive(Component)]

@@ -72,6 +72,7 @@ impl TowerBundle {
             bullet_filter: BulletFilter {
                 filter: false,
                 radius: 10.,
+                exp: 10,
             },
         }
     }

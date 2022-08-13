@@ -255,7 +255,7 @@ fn single_collision(
 
             event_writer.send(GainExpEvent {
                 entity: bullet.owner,
-                exp: 10,
+                exp: bullet_filter.exp,
                 killed: true,
             });
         } else {

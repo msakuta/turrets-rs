@@ -72,6 +72,7 @@ pub(crate) fn spawn_enemies(
             .insert(BulletFilter {
                 filter: true,
                 radius: if boss { ENEMY_SIZE * 2. } else { ENEMY_SIZE },
+                exp: if boss { 150 } else { 10 },
             })
             .insert(StageClear);
     }
