@@ -124,10 +124,10 @@ pub(crate) struct TowerInitBundle {
     pub health: Option<Health>,
 }
 
-fn bullet_shooter_from_level(tower_level: &Option<TowerLevel>) -> BulletShooter {
+fn bullet_shooter_from_level(tower_level: &Option<TowerLevel>, missile: bool) -> BulletShooter {
     BulletShooter::new(
         false,
-        bullet_damage_by_level(tower_level.as_ref().map(|l| l.level).unwrap_or(0)),
+        bullet_damage_by_level(tower_level.as_ref().map(|l| l.level).unwrap_or(0), missile),
     )
 }
 
@@ -138,7 +138,7 @@ pub(crate) fn spawn_turret(
     rotation: f64,
     bundle: TowerInitBundle,
 ) -> Entity {
-    let bullet_shooter = bullet_shooter_from_level(&bundle.tower_level);
+    let bullet_shooter = bullet_shooter_from_level(&bundle.tower_level, false);
     let tower = TowerBundle::new(
         commands,
         Position(position),
@@ -165,7 +165,7 @@ pub(crate) fn spawn_shotgun(
     rotation: f64,
     bundle: TowerInitBundle,
 ) -> Entity {
-    let bullet_shooter = bullet_shooter_from_level(&bundle.tower_level);
+    let bullet_shooter = bullet_shooter_from_level(&bundle.tower_level, false);
     let tower = TowerBundle::new(
         commands,
         Position(position),
@@ -222,7 +222,7 @@ pub(crate) fn spawn_missile_tower(
     rotation: f64,
     bundle: TowerInitBundle,
 ) -> Entity {
-    let bullet_shooter = bullet_shooter_from_level(&bundle.tower_level);
+    let bullet_shooter = bullet_shooter_from_level(&bundle.tower_level, true);
     let tower = TowerBundle::new(
         commands,
         Position(position),
@@ -369,12 +369,19 @@ fn tower_killed_system(
         &mut TowerScore,
         Option<&mut BulletShooter>,
         Option<&mut Healer>,
+        Option<&MissileTower>,
     )>,
     mut reader: EventReader<GainExpEvent>,
 ) {
     for event in reader.iter() {
-        if let Ok((mut tower, mut health, mut scoring_tower, mut bullet_shooter, mut healer)) =
-            query.get_mut(event.entity)
+        if let Ok((
+            mut tower,
+            mut health,
+            mut scoring_tower,
+            mut bullet_shooter,
+            mut healer,
+            missile_tower,
+        )) = query.get_mut(event.entity)
         {
             if event.killed {
                 scoring_tower.kills += 1;
@@ -388,7 +395,8 @@ fn tower_killed_system(
                     .ceil();
                 health.val = health.max;
                 if let Some(ref mut bullet_shooter) = bullet_shooter {
-                    bullet_shooter.damage = bullet_damage_by_level(tower.level);
+                    bullet_shooter.damage =
+                        bullet_damage_by_level(tower.level, missile_tower.is_some());
                 }
                 if let Some(ref mut healer) = healer {
                     healer.heal_amt = heal_amt_by_level(tower.level);
@@ -398,8 +406,9 @@ fn tower_killed_system(
     }
 }
 
-fn bullet_damage_by_level(level: usize) -> f32 {
-    (1.2f32).powf(level as f32)
+fn bullet_damage_by_level(level: usize, missile: bool) -> f32 {
+    let base = if missile { 30. } else { 1. };
+    base * (1.2f32).powf(level as f32)
 }
 
 fn heal_amt_by_level(level: usize) -> f32 {

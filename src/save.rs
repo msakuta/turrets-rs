@@ -124,7 +124,6 @@ pub(crate) fn load_game(
         }
     };
 
-    println!("json: {json_str}");
     match (|| -> Result<(), MyError> {
         let mut json_container: Value = from_str(&json_str)?;
 
@@ -134,7 +133,6 @@ pub(crate) fn load_game(
             .ok_or_else(|| MyError("scoreboard is mandatory".to_string()))?;
         *scoreboard = from_value(json_scoreboard)?;
 
-        println!("json: {json_container:?}");
         if let Some(Value::Array(arr)) = json_container.get_mut("towers").map(|t| t.take()) {
             for mut tower in arr {
                 let position = take_or_continue!(tower, "position");
