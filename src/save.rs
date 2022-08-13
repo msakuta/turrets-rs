@@ -45,7 +45,7 @@ pub(crate) fn save_game(
         match (|| -> Result<(), MyError> {
             let json_towers = query.iter().map(|(position, rotation, tower_score, tower_level, health, shotgun, healer, missile_tower)| -> Result<serde_json::Value, MyError>{
                 Ok(json!({
-                    "type": if shotgun.is_some() { "Shotgun" } else if healer.is_some() { "Healer" } else if missile_tower.is_some() { "Missile" } else { "Turret"},
+                    "type": if shotgun.is_some() { "Shotgun" } else if healer.is_some() { "Healer" } else if missile_tower.is_some() { "MissileTower" } else { "Turret"},
                     "tower_score": tower_score,
                     "tower_level": tower_level,
                     "position": position,

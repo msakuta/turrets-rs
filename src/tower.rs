@@ -124,6 +124,13 @@ pub(crate) struct TowerInitBundle {
     pub health: Option<Health>,
 }
 
+fn bullet_shooter_from_level(tower_level: &Option<TowerLevel>) -> BulletShooter {
+    BulletShooter::new(
+        false,
+        bullet_damage_by_level(tower_level.as_ref().map(|l| l.level).unwrap_or(0)),
+    )
+}
+
 pub(crate) fn spawn_turret(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -131,6 +138,7 @@ pub(crate) fn spawn_turret(
     rotation: f64,
     bundle: TowerInitBundle,
 ) -> Entity {
+    let bullet_shooter = bullet_shooter_from_level(&bundle.tower_level);
     let tower = TowerBundle::new(
         commands,
         Position(position),
@@ -146,7 +154,7 @@ pub(crate) fn spawn_turret(
             ..default()
         })
         .insert_bundle(tower)
-        .insert(BulletShooter::new(false, 1.))
+        .insert(bullet_shooter)
         .id()
 }
 
@@ -157,6 +165,7 @@ pub(crate) fn spawn_shotgun(
     rotation: f64,
     bundle: TowerInitBundle,
 ) -> Entity {
+    let bullet_shooter = bullet_shooter_from_level(&bundle.tower_level);
     let tower = TowerBundle::new(
         commands,
         Position(position),
@@ -172,7 +181,7 @@ pub(crate) fn spawn_shotgun(
             ..default()
         })
         .insert_bundle(tower)
-        .insert(BulletShooter::new(false, 1.))
+        .insert(bullet_shooter)
         .insert(Shotgun)
         .id()
 }
@@ -210,6 +219,7 @@ pub(crate) fn spawn_missile_tower(
     rotation: f64,
     bundle: TowerInitBundle,
 ) -> Entity {
+    let bullet_shooter = bullet_shooter_from_level(&bundle.tower_level);
     let tower = TowerBundle::new(
         commands,
         Position(position),
@@ -225,7 +235,7 @@ pub(crate) fn spawn_missile_tower(
             ..default()
         })
         .insert_bundle(tower)
-        .insert(BulletShooter::new(false, 1.))
+        .insert(bullet_shooter)
         .insert(MissileTower)
         .id()
 }
@@ -375,7 +385,7 @@ fn tower_killed_system(
                     .ceil();
                 health.val = health.max;
                 if let Some(ref mut bullet_shooter) = bullet_shooter {
-                    bullet_shooter.damage = (1.2f32).powf(tower.level as f32);
+                    bullet_shooter.damage = bullet_damage_by_level(tower.level);
                 }
                 if let Some(ref mut healer) = healer {
                     healer.heal_amt = 1. + 0.1 * tower.level as f32;
@@ -383,4 +393,8 @@ fn tower_killed_system(
             }
         }
     }
+}
+
+fn bullet_damage_by_level(level: usize) -> f32 {
+    (1.2f32).powf(level as f32)
 }
