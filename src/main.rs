@@ -195,7 +195,7 @@ fn erase_entities_new_game<T: Component>(
     if had_clear_event {
         println!("Clear event read for {:?}", std::any::type_name::<T>());
         for entity in query.iter() {
-            commands.entity(entity).despawn();
+            commands.entity(entity).despawn_recursive();
         }
     }
 }
@@ -212,7 +212,7 @@ fn reset_game(
     if level.timer_finished() {
         println!("Round finished!");
         for entity in query.iter() {
-            commands.entity(entity).despawn();
+            commands.entity(entity).despawn_recursive();
         }
 
         // Restore full health on stage clear
@@ -267,7 +267,6 @@ fn sprite_transform_single(
     if let Some(rotation) = rotation {
         trans = trans.with_rotation(Quat::from_rotation_z(rotation.0 as f32));
     }
-    trans = trans.with_scale(Vec3::new(3., 3., 3.));
     *transform = trans;
 }
 

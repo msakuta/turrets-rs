@@ -47,8 +47,8 @@ pub(super) fn missile_system(
         // Delete expired missiles (and don't forget the trail)
         missile.time_to_live -= delta_time;
         if missile.time_to_live < 0. {
-            commands.entity(entity).despawn();
-            commands.entity(missile.trail).despawn();
+            commands.entity(entity).despawn_recursive();
+            commands.entity(missile.trail).despawn_recursive();
             continue;
         }
 

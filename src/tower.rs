@@ -8,12 +8,17 @@ use crate::{
 };
 use ::serde::{Deserialize, Serialize};
 use bevy::prelude::*;
+use bevy_prototype_lyon::{entity::ShapeBundle, prelude::*, shapes::Circle};
 
 pub(crate) use healer::Healer;
+
+const TOWER_SIZE: f32 = 32.;
+const MISSILE_TOWER_SIZE: f32 = 48.;
 
 #[derive(Component, Serialize, Deserialize)]
 pub(crate) struct Tower {
     pub health_bar: (Entity, Entity),
+    pub size: f32,
 }
 
 #[derive(Component, Serialize, Deserialize)]
@@ -55,6 +60,7 @@ impl TowerBundle {
         commands: &mut Commands,
         position: Position,
         rotation: Rotation,
+        size: f32,
         bundle: TowerInitBundle,
     ) -> Self {
         Self {
@@ -62,6 +68,7 @@ impl TowerBundle {
             rotation,
             tower: Tower {
                 health_bar: health_bar(commands),
+                size,
             },
             tower_level: bundle.tower_level.unwrap_or(TowerLevel {
                 level: 0,
@@ -79,6 +86,19 @@ impl TowerBundle {
             },
         }
     }
+}
+
+fn shape_from_size(size: f32) -> ShapeBundle {
+    let line = Circle {
+        radius: size,
+        center: Vec2::ZERO,
+    };
+
+    GeometryBuilder::build_as(
+        &line,
+        DrawMode::Stroke(StrokeMode::new(Color::rgba(0.0, 0.8, 0.8, 1.), 1.0)),
+        Transform::from_xyz(0., 0., 0.05),
+    )
 }
 
 #[derive(Component)]
@@ -131,6 +151,22 @@ fn bullet_shooter_from_level(tower_level: &Option<TowerLevel>, missile: bool) ->
     )
 }
 
+fn tower_sprite_bundle(texture_name: &str, asset_server: &AssetServer, scale: f32) -> SpriteBundle {
+    SpriteBundle {
+        texture: asset_server.load(texture_name),
+        transform: Transform::from_translation(Vec3::new(0., 0., 0.1))
+            .with_scale(Vec3::new(scale, scale, scale)),
+        ..default()
+    }
+}
+
+fn tower_transform_bundle(position: Vec2) -> TransformBundle {
+    TransformBundle {
+        local: Transform::from_translation(Vec3::new(position.x, position.y, 0.1)),
+        ..default()
+    }
+}
+
 pub(crate) fn spawn_turret(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -143,18 +179,22 @@ pub(crate) fn spawn_turret(
         commands,
         Position(position),
         Rotation(rotation),
+        TOWER_SIZE,
         TowerInitBundle {
             health: Some(bundle.health.unwrap_or(TOWER_HEALTH)),
             ..bundle
         },
     );
+    let sprite = commands
+        .spawn_bundle(tower_sprite_bundle("turret.png", asset_server, 3.))
+        .id();
+    let shape = commands.spawn_bundle(shape_from_size(TOWER_SIZE)).id();
     commands
-        .spawn_bundle(SpriteBundle {
-            texture: asset_server.load("turret.png"),
-            ..default()
-        })
-        .insert_bundle(tower)
+        .spawn_bundle(tower)
+        .insert_bundle(tower_transform_bundle(position))
         .insert(bullet_shooter)
+        .add_child(sprite)
+        .add_child(shape)
         .id()
 }
 
@@ -170,19 +210,23 @@ pub(crate) fn spawn_shotgun(
         commands,
         Position(position),
         Rotation(rotation),
+        TOWER_SIZE,
         TowerInitBundle {
             health: Some(bundle.health.unwrap_or(SHOTGUN_HEALTH)),
             ..bundle
         },
     );
+    let sprite = commands
+        .spawn_bundle(tower_sprite_bundle("shotgun.png", asset_server, 3.))
+        .id();
+    let shape = commands.spawn_bundle(shape_from_size(TOWER_SIZE)).id();
     commands
-        .spawn_bundle(SpriteBundle {
-            texture: asset_server.load("shotgun.png"),
-            ..default()
-        })
-        .insert_bundle(tower)
+        .spawn_bundle(tower)
+        .insert_bundle(tower_transform_bundle(position))
         .insert(bullet_shooter)
         .insert(Shotgun)
+        .add_child(sprite)
+        .add_child(shape)
         .id()
 }
 
@@ -200,18 +244,22 @@ pub(crate) fn spawn_healer(
         commands,
         Position(position),
         Rotation(rotation),
+        TOWER_SIZE,
         TowerInitBundle {
             health: Some(bundle.health.unwrap_or(HEALER_HEALTH)),
             ..bundle
         },
     );
+    let sprite = commands
+        .spawn_bundle(tower_sprite_bundle("healer.png", asset_server, 3.))
+        .id();
+    let shape = commands.spawn_bundle(shape_from_size(TOWER_SIZE)).id();
     commands
-        .spawn_bundle(SpriteBundle {
-            texture: asset_server.load("healer.png"),
-            ..default()
-        })
-        .insert_bundle(tower)
+        .spawn_bundle(tower)
+        .insert_bundle(tower_transform_bundle(position))
         .insert(healer)
+        .add_child(sprite)
+        .add_child(shape)
         .id()
 }
 
@@ -227,19 +275,25 @@ pub(crate) fn spawn_missile_tower(
         commands,
         Position(position),
         Rotation(rotation),
+        MISSILE_TOWER_SIZE,
         TowerInitBundle {
             health: Some(bundle.health.unwrap_or(MISSILE_HEALTH)),
             ..bundle
         },
     );
+    let sprite = commands
+        .spawn_bundle(tower_sprite_bundle("missile-tower.png", asset_server, 3.))
+        .id();
+    let shape = commands
+        .spawn_bundle(shape_from_size(MISSILE_TOWER_SIZE))
+        .id();
     commands
-        .spawn_bundle(SpriteBundle {
-            texture: asset_server.load("missile-tower.png"),
-            ..default()
-        })
-        .insert_bundle(tower)
+        .spawn_bundle(tower)
+        .insert_bundle(tower_transform_bundle(position))
         .insert(bullet_shooter)
         .insert(MissileTower)
+        .add_child(sprite)
+        .add_child(shape)
         .id()
 }
 

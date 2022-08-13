@@ -104,9 +104,22 @@ pub(crate) fn shoot_bullet(
                     let trail = missile_tower.map(|_| missile::gen_trail(&mut commands, &position));
 
                     sprite_transform_single(&position, Some(&bullet_rotation), &mut transform, 0.);
-                    let mut builder = commands.spawn_bundle(SpriteBundle {
-                        texture: asset_server.load(file),
-                        transform,
+                    let sprite = commands
+                        .spawn_bundle(SpriteBundle {
+                            texture: asset_server.load(file),
+                            transform: Transform::from_scale(Vec3::ONE * 3.),
+                            ..default()
+                        })
+                        .id();
+
+                    let mut builder = commands.spawn();
+                    builder.insert(Bullet {
+                        filter: rotation.is_some(),
+                        owner: entity,
+                        damage: bullet_shooter.damage,
+                    });
+                    builder.insert_bundle(TransformBundle {
+                        local: transform,
                         ..default()
                     });
                     builder.insert(position);
@@ -114,15 +127,11 @@ pub(crate) fn shoot_bullet(
                     builder.insert(Velocity(
                         speed * Vec2::new(angle.cos() as f32, angle.sin() as f32),
                     ));
-                    builder.insert(Bullet {
-                        filter: rotation.is_some(),
-                        owner: entity,
-                        damage: bullet_shooter.damage,
-                    });
                     builder.insert(StageClear);
                     if let Some((target, trail)) = target.zip(trail) {
                         builder.insert(Missile::new(target, trail, &position));
                     }
+                    builder.add_child(sprite);
                 };
 
             if let Some(rotation) = rotation {
@@ -232,12 +241,12 @@ fn single_collision(
     );
 
     if collision.is_some() {
-        commands.entity(bullet_entity).despawn();
+        commands.entity(bullet_entity).despawn_recursive();
         if let Some(missile) = missile {
-            commands.entity(missile.trail).despawn();
+            commands.entity(missile.trail).despawn_recursive();
         }
         if health.val < 1. {
-            commands.entity(entity).despawn();
+            commands.entity(entity).despawn_recursive();
             if let Some(tower) = tower {
                 commands.entity(tower.health_bar.0).despawn();
                 commands.entity(tower.health_bar.1).despawn();
@@ -290,11 +299,10 @@ fn cleanup(
             || position.0.y < -height / 2.
             || height / 2. < position.0.y
         {
-            commands.entity(entity).despawn();
+            commands.entity(entity).despawn_recursive();
             if let Some(missile) = missile {
-                commands.entity(missile.trail).despawn();
+                commands.entity(missile.trail).despawn_recursive();
             }
-            // println!("Despawned {entity:?} ({})", std::any::type_name::<T>());
         }
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
     bullet::{BulletShooter, ENEMY_SIZE},
-    BulletFilter, Health, Level, Position, StageClear, Velocity,
+    sprite_transform_single, BulletFilter, Health, Level, Position, StageClear, Velocity,
 };
 use bevy::prelude::*;
 
@@ -55,14 +55,27 @@ pub(crate) fn spawn_enemies(
             std::mem::swap(&mut x, &mut y);
         }
 
+        let position = Position(Vec2::new(x, y));
+
         let boss = 0 < level.difficulty() && rand::random::<f64>() < 0.1f64;
 
-        commands
+        let mut transform = Transform::default();
+        sprite_transform_single(&position, None, &mut transform, 0.05);
+
+        let sprite = commands
             .spawn_bundle(SpriteBundle {
                 texture: asset_server.load(if boss { "boss.png" } else { "enemy.png" }),
+                transform: Transform::from_scale(Vec3::ONE * 3.),
                 ..default()
             })
-            .insert(Position(Vec2::new(x, y)))
+            .id();
+
+        commands
+            .spawn_bundle(TransformBundle {
+                local: transform,
+                ..default()
+            })
+            .insert(position)
             .insert(Velocity(
                 10. * Vec2::new(rand::random::<f32>() - 0.5, rand::random::<f32>() - 0.5),
             ))
@@ -74,7 +87,8 @@ pub(crate) fn spawn_enemies(
                 radius: if boss { ENEMY_SIZE * 2. } else { ENEMY_SIZE },
                 exp: if boss { 150 } else { 10 },
             })
-            .insert(StageClear);
+            .insert(StageClear)
+            .add_child(sprite);
     }
 }
 

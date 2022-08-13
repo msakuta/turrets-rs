@@ -1,5 +1,8 @@
 use crate::{tower::Tower, Position};
-use bevy::{ecs::schedule::ShouldRun, prelude::*};
+use bevy::{
+    ecs::{schedule::ShouldRun, system::QueryComponentError},
+    prelude::*,
+};
 
 pub(crate) struct MousePlugin;
 
@@ -52,7 +55,7 @@ fn mouse_system(
     mut commands: Commands,
     windows: Res<Windows>,
     mut query: Query<(&mut Transform, &mut Visibility), With<MouseCursor>>,
-    mut query_towers: Query<(Entity, &mut Position), With<Tower>>,
+    mut query_towers: Query<(Entity, &mut Position, &Tower)>,
     query_tower_health: Query<&Tower>,
     btn: Res<Input<MouseButton>>,
     mut selected_tower: ResMut<SelectedTower>,
@@ -77,20 +80,36 @@ fn mouse_system(
 
         if let Some(selected_tower) = selected_tower.as_ref() {
             if selected_tower.dragging {
-                if let Some(mut tower) = query_towers
-                    .get_component_mut::<Position>(selected_tower.tower)
-                    .ok()
-                {
-                    tower.0 = mouse_screen;
-                    *cursor_transform = Transform::from_xyz(mouse_screen.x, mouse_screen.y, 0.2)
-                        .with_scale(Vec3::new(2., 2., 1.));
-                    dragging = true;
-                }
+                match (|| -> Result<(), QueryComponentError> {
+                    let my_size = query_towers
+                        .get_component::<Tower>(selected_tower.tower)?
+                        .size;
+
+                    let hit_others = query_towers.iter().any(|(entity, position, tower)| {
+                        selected_tower.tower != entity
+                            && mouse_screen.distance_squared(position.0)
+                                < (tower.size + my_size).powf(2.)
+                    });
+
+                    if !hit_others {
+                        let mut tower =
+                            query_towers.get_component_mut::<Position>(selected_tower.tower)?;
+                        tower.0 = mouse_screen;
+                        *cursor_transform =
+                            Transform::from_xyz(mouse_screen.x, mouse_screen.y, 0.2)
+                                .with_scale(Vec3::new(2., 2., 1.));
+                    }
+                    Ok(())
+                })() {
+                    Ok(()) => (),
+                    Err(e) => println!("Query component error! the logic seems wrong! {e:?}"),
+                };
+                dragging = true;
             }
         }
 
         if !dragging {
-            for (entity, tower_position) in query_towers.iter() {
+            for (entity, tower_position, _) in query_towers.iter() {
                 if tower_position.0.distance(mouse_screen) < 30. {
                     visibility.is_visible = true;
                     *cursor_transform =

@@ -78,7 +78,7 @@ pub(super) fn difficulty_event_system(
     // We only care about the last event if multiple StartEvents have issued
     if let Some(event) = reader.iter().last() {
         for entity in query.iter() {
-            commands.entity(entity).despawn();
+            commands.entity(entity).despawn_recursive();
         }
         *level = Level::start(event.0);
         scoreboard.score = 0.;

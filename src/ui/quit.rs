@@ -84,7 +84,7 @@ pub(super) fn quit_event_system(
     if reader.iter().last().is_some() {
         println!("Received QuitEvent");
         for entity in query.iter() {
-            commands.entity(entity).despawn();
+            commands.entity(entity).despawn_recursive();
         }
         *level = Level::Select;
         writer.send(ClearEvent);
