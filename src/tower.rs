@@ -193,6 +193,9 @@ pub(crate) fn spawn_healer(
     rotation: f64,
     bundle: TowerInitBundle,
 ) -> Entity {
+    let healer = Healer::new_with_heal_amt(heal_amt_by_level(
+        bundle.tower_level.as_ref().map(|l| l.level).unwrap_or(0),
+    ));
     let tower = TowerBundle::new(
         commands,
         Position(position),
@@ -208,7 +211,7 @@ pub(crate) fn spawn_healer(
             ..default()
         })
         .insert_bundle(tower)
-        .insert(Healer::new())
+        .insert(healer)
         .id()
 }
 
@@ -388,7 +391,7 @@ fn tower_killed_system(
                     bullet_shooter.damage = bullet_damage_by_level(tower.level);
                 }
                 if let Some(ref mut healer) = healer {
-                    healer.heal_amt = 1. + 0.1 * tower.level as f32;
+                    healer.heal_amt = heal_amt_by_level(tower.level);
                 }
             }
         }
@@ -397,4 +400,8 @@ fn tower_killed_system(
 
 fn bullet_damage_by_level(level: usize) -> f32 {
     (1.2f32).powf(level as f32)
+}
+
+fn heal_amt_by_level(level: usize) -> f32 {
+    1. + 0.1 * level as f32
 }

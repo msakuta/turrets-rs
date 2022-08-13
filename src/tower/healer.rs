@@ -3,7 +3,6 @@ use crate::{bullet::GainExpEvent, Health, Position, Rotation, Target, Velocity};
 use bevy::prelude::*;
 
 const HEALER_RANGE: f32 = 300.;
-const HEALER_AMOUNT: f32 = 1.;
 const HEALER_INTERVAL: f32 = 2.;
 
 #[derive(Component)]
@@ -14,11 +13,11 @@ pub(crate) struct Healer {
 }
 
 impl Healer {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new_with_heal_amt(heal_amt: f32) -> Self {
         Self {
             enabled: false,
             cooldown: 2.,
-            heal_amt: HEALER_AMOUNT,
+            heal_amt,
         }
     }
 }
