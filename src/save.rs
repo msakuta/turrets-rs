@@ -8,6 +8,9 @@ use crate::{
 use bevy::prelude::*;
 use serde_json::{from_str, from_value, json, Value};
 
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+const WASM_SAVE_KEY: &str = "turret-rs/save";
+
 pub(crate) struct SaveGameEvent;
 
 #[derive(Debug)]
@@ -56,7 +59,17 @@ pub(crate) fn save_game(
                 "towers": json_towers,
             });
 
+            #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
             std::fs::write("save.json", serde_json::to_string(&json_container)?)?;
+
+            #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+            {
+                let local_storage = web_sys::window().unwrap().local_storage().unwrap().unwrap();
+
+                local_storage
+                    .set_item(WASM_SAVE_KEY, &serde_json::to_string(&json_container)?)
+                    .unwrap();
+            }
 
             Ok(())
         })() {
@@ -92,85 +105,100 @@ pub(crate) fn load_game(
     asset_server: &Res<AssetServer>,
     scoreboard: &mut Scoreboard,
 ) {
-    if let Ok(json_str) = std::fs::read_to_string("save.json") {
-        println!("json: {json_str}");
-        match (|| -> Result<(), MyError> {
-            let mut json_container: Value = from_str(&json_str)?;
-
-            let json_scoreboard = json_container
-                .get_mut("scoreboard")
-                .map(|j| j.take())
-                .ok_or_else(|| MyError("scoreboard is mandatory".to_string()))?;
-            *scoreboard = from_value(json_scoreboard)?;
-
-            println!("json: {json_container:?}");
-            if let Some(Value::Array(arr)) = json_container.get_mut("towers").map(|t| t.take()) {
-                for mut tower in arr {
-                    let position = take_or_continue!(tower, "position");
-                    let rotation = take_or_continue!(tower, "rotation");
-                    let health = take_or_continue!(tower, "health");
-                    let tower_score = take_or_continue!(tower, "tower_score");
-                    let tower_level = take_or_continue!(tower, "tower_level");
-                    let tower_type = if let Some(Value::String(s)) = tower.get("type") {
-                        s
-                    } else {
-                        println!("No type defined");
-                        continue;
-                    };
-
-                    let bundle = TowerInitBundle {
-                        health: Some(serde_json::from_value(health)?),
-                        tower_score: Some(serde_json::from_value(tower_score)?),
-                        tower_level: Some(serde_json::from_value(tower_level)?),
-                    };
-
-                    match tower_type as _ {
-                        "Turret" => {
-                            spawn_turret(
-                                commands,
-                                asset_server,
-                                serde_json::from_value(position)?,
-                                serde_json::from_value(rotation)?,
-                                bundle,
-                            );
-                        }
-                        "Shotgun" => {
-                            spawn_shotgun(
-                                commands,
-                                asset_server,
-                                serde_json::from_value(position)?,
-                                serde_json::from_value(rotation)?,
-                                bundle,
-                            );
-                        }
-                        "Healer" => {
-                            spawn_healer(
-                                commands,
-                                asset_server,
-                                serde_json::from_value(position)?,
-                                serde_json::from_value(rotation)?,
-                                bundle,
-                            );
-                        }
-                        "MissileTower" => {
-                            spawn_missile_tower(
-                                commands,
-                                asset_server,
-                                serde_json::from_value(position)?,
-                                serde_json::from_value(rotation)?,
-                                bundle,
-                            );
-                        }
-                        _ => println!("Unrecognized type!"),
-                    }
-                }
-            }
-            Ok(())
-        })() {
-            Ok(()) => println!("Loaded from file successfully"),
-            Err(e) => println!("Load error: {e:?}"),
-        }
+    #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
+    let json_str = if let Ok(json_str) = std::fs::read_to_string("save.json") {
+        json_str
     } else {
         println!("Save file was not found!");
+        return;
+    };
+
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    let json_str = {
+        let local_storage = web_sys::window().unwrap().local_storage().unwrap().unwrap();
+
+        if let Some(value) = local_storage.get_item(WASM_SAVE_KEY).unwrap() {
+            value
+        } else {
+            return;
+        }
+    };
+
+    println!("json: {json_str}");
+    match (|| -> Result<(), MyError> {
+        let mut json_container: Value = from_str(&json_str)?;
+
+        let json_scoreboard = json_container
+            .get_mut("scoreboard")
+            .map(|j| j.take())
+            .ok_or_else(|| MyError("scoreboard is mandatory".to_string()))?;
+        *scoreboard = from_value(json_scoreboard)?;
+
+        println!("json: {json_container:?}");
+        if let Some(Value::Array(arr)) = json_container.get_mut("towers").map(|t| t.take()) {
+            for mut tower in arr {
+                let position = take_or_continue!(tower, "position");
+                let rotation = take_or_continue!(tower, "rotation");
+                let health = take_or_continue!(tower, "health");
+                let tower_score = take_or_continue!(tower, "tower_score");
+                let tower_level = take_or_continue!(tower, "tower_level");
+                let tower_type = if let Some(Value::String(s)) = tower.get("type") {
+                    s
+                } else {
+                    println!("No type defined");
+                    continue;
+                };
+
+                let bundle = TowerInitBundle {
+                    health: Some(serde_json::from_value(health)?),
+                    tower_score: Some(serde_json::from_value(tower_score)?),
+                    tower_level: Some(serde_json::from_value(tower_level)?),
+                };
+
+                match tower_type as _ {
+                    "Turret" => {
+                        spawn_turret(
+                            commands,
+                            asset_server,
+                            serde_json::from_value(position)?,
+                            serde_json::from_value(rotation)?,
+                            bundle,
+                        );
+                    }
+                    "Shotgun" => {
+                        spawn_shotgun(
+                            commands,
+                            asset_server,
+                            serde_json::from_value(position)?,
+                            serde_json::from_value(rotation)?,
+                            bundle,
+                        );
+                    }
+                    "Healer" => {
+                        spawn_healer(
+                            commands,
+                            asset_server,
+                            serde_json::from_value(position)?,
+                            serde_json::from_value(rotation)?,
+                            bundle,
+                        );
+                    }
+                    "MissileTower" => {
+                        spawn_missile_tower(
+                            commands,
+                            asset_server,
+                            serde_json::from_value(position)?,
+                            serde_json::from_value(rotation)?,
+                            bundle,
+                        );
+                    }
+                    _ => println!("Unrecognized type!"),
+                }
+            }
+        }
+        Ok(())
+    })() {
+        Ok(()) => println!("Loaded from file successfully"),
+        Err(e) => println!("Load error: {e:?}"),
     }
 }
