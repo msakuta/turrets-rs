@@ -10,6 +10,15 @@ And I feel limited in maintaining JavaScript project as it scales.
 
 It uses [Bevy](https://bevyengine.org/) game engine.
 
+## Game state
+
+The game state is saved to:
+* the local file named "save.json", if it was native build
+* the browser's localStorage, if it was Wasm build
+
+The game is loaded at the start of the application and automatically saved on stage clear.
+If you exit before a stage finishes, the progress will roll back to the beginning of the stage.
+
 ## Build native game
 
 Install Rust.
