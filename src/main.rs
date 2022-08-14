@@ -238,6 +238,9 @@ fn reset_game(
             {
                 *high_score = Some(score);
             }
+            if let Some(next_difficulty) = scoreboard.stages.get_mut(*difficulty + 1) {
+                next_difficulty.unlocked = true;
+            }
         }
 
         *level = Level::Select;

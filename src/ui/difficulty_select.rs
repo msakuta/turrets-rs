@@ -17,6 +17,8 @@ impl Plugin for DifficultySelectPlugin {
         app.add_system(difficulty_button_system);
         app.add_system(difficulty_event_system);
         app.add_system(show_difficulty_buttons_system);
+        app.add_system(cleared_icon_system);
+        app.add_system(high_score_text_system);
     }
 }
 
@@ -79,7 +81,6 @@ pub(super) fn add_difficulty_buttons(commands: &mut Commands, asset_server: &Res
                                 focus_policy: FocusPolicy::Pass,
                                 ..default()
                             })
-                            .insert(DifficultyButtonFilter)
                             .insert(DifficultyCleared(difficulty));
 
                         parent
@@ -162,12 +163,17 @@ fn difficulty_button_system(
     >,
     mut writer: EventWriter<StartEvent>,
     level: Res<Level>,
+    scoreboard: Res<Scoreboard>,
 ) {
     if let Level::Select = level.as_ref() {
         for (interaction, mut color, difficulty) in interaction_query.iter_mut() {
             match *interaction {
                 Interaction::Clicked => {
-                    writer.send(StartEvent(difficulty.difficulty));
+                    if scoreboard.stages[difficulty.difficulty].unlocked {
+                        writer.send(StartEvent(difficulty.difficulty));
+                    } else {
+                        println!("Difficulty {} is locked!", difficulty.difficulty);
+                    }
                 }
                 Interaction::Hovered => {
                     *color = HOVERED_BUTTON.into();
@@ -181,25 +187,47 @@ fn difficulty_button_system(
 }
 
 fn show_difficulty_buttons_system(
-    mut button_query: Query<
-        (&mut Visibility, Option<&DifficultyCleared>),
-        With<DifficultyButtonFilter>,
-    >,
-    mut high_score_query: Query<(&mut Text, &HighScoreText)>,
+    mut button_query: Query<&mut Visibility, With<DifficultyButtonFilter>>,
     level: Res<Level>,
-    scoreboard: Res<Scoreboard>,
 ) {
-    for (mut button, cleared) in button_query.iter_mut() {
-        button.is_visible = if let Level::Select = level.as_ref() {
-            cleared
-                .and_then(|cleared| scoreboard.stages.get(cleared.0))
-                .map(|stage| stage.high_score.is_some())
-                .unwrap_or(true)
+    for mut visibility in button_query.iter_mut() {
+        visibility.is_visible = if let Level::Select = level.as_ref() {
+            true
         } else {
             false
         };
     }
+}
 
+fn cleared_icon_system(
+    mut icon_query: Query<(&mut Visibility, &mut UiImage, &DifficultyCleared)>,
+    level: Res<Level>,
+    scoreboard: Res<Scoreboard>,
+    asset_server: Res<AssetServer>,
+) {
+    for (mut visibility, mut image, cleared) in icon_query.iter_mut() {
+        visibility.is_visible = if let Level::Select = level.as_ref() {
+            if let Some(score) = scoreboard.stages.get(cleared.0) {
+                if score.high_score.is_some() {
+                    *image = asset_server.load("checked.png").into();
+                    true
+                } else {
+                    *image = asset_server.load("locked.png").into();
+                    !score.unlocked
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+    }
+}
+
+fn high_score_text_system(
+    mut high_score_query: Query<(&mut Text, &HighScoreText)>,
+    scoreboard: Res<Scoreboard>,
+) {
     for (mut text, high_score_text) in high_score_query.iter_mut() {
         text.sections[0].value = if let Some(score) = scoreboard
             .stages
