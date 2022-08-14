@@ -214,12 +214,10 @@ fn agile_enemy_system(
     for (mut velocity, position, mut rotation, mut target, mut bullet_shooter, mut agile_enemy) in
         query.iter_mut()
     {
-        let new_target = if let Some((target, position)) = target.0.map(|target| {
-            (
-                target,
-                query_towers.get_component::<Position>(target).unwrap(),
-            )
-        }) {
+        let new_target = if let Some((target, position)) = target
+            .0
+            .and_then(|target| Some((target, query_towers.get_component::<Position>(target).ok()?)))
+        {
             Some((target, position))
         } else {
             let new_target = query_towers
