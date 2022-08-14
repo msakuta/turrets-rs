@@ -57,15 +57,6 @@ pub(super) fn add_scoreboard(commands: &mut Commands, asset_server: &Res<AssetSe
                         ],
                         ..default()
                     },
-                    // style: Style {
-                    //     position_type: PositionType::Absolute,
-                    //     position: Rect {
-                    //         top: PADDING_PX,
-                    //         left: PADDING_PX,
-                    //         ..default()
-                    //     },
-                    //     ..default()
-                    // },
                     ..default()
                 })
                 .insert(LevelText);
@@ -93,15 +84,6 @@ pub(super) fn add_scoreboard(commands: &mut Commands, asset_server: &Res<AssetSe
                         ],
                         ..default()
                     },
-                    // style: Style {
-                    //     position_type: PositionType::Absolute,
-                    //     position: Rect {
-                    //         top: PADDING_PX,
-                    //         left: PADDING_PX,
-                    //         ..default()
-                    //     },
-                    //     ..default()
-                    // },
                     ..default()
                 })
                 .insert(ScoreText);
@@ -129,15 +111,6 @@ pub(super) fn add_scoreboard(commands: &mut Commands, asset_server: &Res<AssetSe
                         ],
                         ..default()
                     },
-                    // style: Style {
-                    //     position_type: PositionType::Absolute,
-                    //     position: Rect {
-                    //         top: PADDING_PX,
-                    //         left: PADDING_PX,
-                    //         ..default()
-                    //     },
-                    //     ..default()
-                    // },
                     ..default()
                 })
                 .insert(CreditsText);
