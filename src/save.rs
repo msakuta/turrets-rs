@@ -3,7 +3,7 @@ use crate::{
         spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_turret, Healer, MissileTower,
         Shotgun, Tower, TowerInitBundle, TowerLevel, TowerScore,
     },
-    Health, Position, Rotation, Scoreboard,
+    Health, Position, Rotation, Scoreboard, MAX_DIFFICULTY,
 };
 use bevy::prelude::*;
 use serde_json::{from_str, from_value, json, Value};
@@ -134,7 +134,7 @@ pub(crate) fn load_game(
         *scoreboard = from_value(json_scoreboard)?;
 
         // Migration from old saves
-        if scoreboard.stages.is_empty() {
+        if scoreboard.stages.len() < MAX_DIFFICULTY {
             println!("Migrated!");
             scoreboard.stages = Scoreboard::stage_scores();
         }

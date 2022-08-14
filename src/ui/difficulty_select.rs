@@ -2,7 +2,7 @@ use bevy::{prelude::*, ui::FocusPolicy};
 
 use crate::{
     tower::{spawn_towers, Tower},
-    Level, Scoreboard, StageClear,
+    Level, Scoreboard, StageClear, MAX_DIFFICULTY,
 };
 
 use super::{quit::HOVERED_BUTTON, StartEvent, TEXT_COLOR};
@@ -50,8 +50,13 @@ pub(super) fn add_difficulty_buttons(commands: &mut Commands, asset_server: &Res
         })
         .insert(DifficultyButtonFilter)
         .with_children(|parent| {
-            for difficulty in 0..3 {
-                let color = Color::rgb(0.15 + difficulty as f32 / 3. * 0.85, 0.15, 0.15).into();
+            for difficulty in 0..MAX_DIFFICULTY {
+                let color = Color::rgb(
+                    0.15 + difficulty as f32 / MAX_DIFFICULTY as f32 * 0.5,
+                    0.15,
+                    0.15,
+                )
+                .into();
 
                 parent
                     .spawn_bundle(ButtonBundle {

@@ -17,6 +17,8 @@ use bevy::prelude::*;
 use save::{load_game, save_game};
 use serde::{Deserialize, Serialize};
 
+const MAX_DIFFICULTY: usize = 5;
+
 fn main() {
     App::new()
         .add_event::<ClearEvent>()
@@ -108,7 +110,7 @@ impl Default for Scoreboard {
 
 impl Scoreboard {
     fn stage_scores() -> Vec<StageScore> {
-        (0..3)
+        (0..MAX_DIFFICULTY)
             .map(|difficulty| StageScore {
                 unlocked: difficulty <= 0,
                 high_score: None,

@@ -44,7 +44,7 @@ struct ProgressBar;
 const SCOREBOARD_FONT_SIZE: f32 = 40.0;
 const PADDING: f32 = 5.;
 const PADDING_PX: Val = Val::Px(PADDING);
-const TEXT_COLOR: Color = Color::rgb(0.7, 0.7, 0.7);
+const TEXT_COLOR: Color = Color::rgb(0.9, 0.9, 0.9);
 const SCORE_COLOR: Color = Color::rgb(1.0, 0.5, 0.5);
 
 const STATUS_FONT_SIZE: f32 = 20.0;
