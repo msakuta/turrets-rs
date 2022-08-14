@@ -5,7 +5,7 @@ use crate::{
     tower::{apprach_angle, Tower},
     BulletFilter, Health, Level, Position, Rotation, StageClear, Target, Velocity,
 };
-use bevy::prelude::*;
+use bevy::{ecs::system::EntityCommands, prelude::*};
 
 pub(crate) struct EnemyPlugin;
 
@@ -16,7 +16,8 @@ impl Plugin for EnemyPlugin {
                 .with_run_criteria(tower_not_dragging)
                 .with_system(spawn_enemies)
                 .with_system(enemy_system)
-                .with_system(agile_enemy_system),
+                .with_system(agile_enemy_system)
+                .with_system(sturdy_enemy_system),
         );
     }
 }
@@ -27,6 +28,9 @@ pub(crate) struct Enemy;
 #[derive(Component)]
 struct AgileEnemy(bool);
 
+#[derive(Component)]
+struct SturdyEnemy;
+
 const MAX_ENEMIES: usize = 100;
 
 struct EnemySpec {
@@ -35,38 +39,56 @@ struct EnemySpec {
     health: f32,
     size: f32,
     exp: usize,
-    is_agile: bool,
-    freq: fn(f: f32) -> f32,
+    more_components: fn(&mut EntityCommands),
+    freq: fn(f32) -> f32,
 }
 
-impl EnemySpec {
-    const fn default() -> Self {
-        Self {
-            waves: 0,
-            image: "",
-            health: 10.,
-            size: ENEMY_SIZE,
-            exp: 10,
-            is_agile: false,
-            freq: |f| {
-                if f < 20. {
-                    (f + 2.) / 20.
-                } else {
-                    1. / (f - 20. + 1.)
-                }
-            },
-        }
-    }
-}
+// I wanted to use `const fn default` to define the default set of parameters,
+//  but for some reason I cannot put a member field with a type of function pointer
+// `more_components: fn(&mut EntityCommands)` in a constant expression, so I couldn't make it a callback
+// that is customizable for each EnemySpec.
+// If I try, the compiler throws an error `mutable references are not allowed in constant functions`,
+// which doesn't make sense at all. I'm passing a function pointer that takes a mutable reference as
+// a parameter, but the function pointer itself is by no means mutable. It is not even a closure.
+// If I change the signature of the function pointer to `fn(&EntityCommands)`, it compiles, which
+// makes even less sense. In any case, I need a mutable EntityCommands to add components. Thank you.
+//
+// impl EnemySpec {
+//     const fn default() -> Self {
+//         Self {
+//             waves: 0,
+//             image: "",
+//             health: 10.,
+//             size: ENEMY_SIZE,
+//             exp: 10,
+//             more_components: |_| (),
+//             freq: |f| {
+//                 if f < 20. {
+//                     (f + 2.) / 20.
+//                 } else {
+//                     1. / (f - 20. + 1.)
+//                 }
+//             },
+//         }
+//     }
+// }
 
-const ENEMY_SPECS: [EnemySpec; 3] = [
+const ENEMY_SPECS: [EnemySpec; 4] = [
     EnemySpec {
         waves: 0,
         image: "enemy.png",
         health: 10.,
         size: ENEMY_SIZE,
         exp: 10,
-        ..EnemySpec::default()
+        more_components: |_| (),
+        freq: |f| {
+            if f < 20. {
+                (f + 2.) / 20.
+            } else {
+                1. / (f - 20. + 1.)
+            }
+        },
+        // ..EnemySpec::default()
     },
     EnemySpec {
         waves: 5,
@@ -74,6 +96,7 @@ const ENEMY_SPECS: [EnemySpec; 3] = [
         health: 150.,
         size: ENEMY_SIZE * 2.,
         exp: 150,
+        more_components: |_| (),
         freq: |f| {
             if f < 40. {
                 (f * 5000. + 10000.) / 10000000.
@@ -81,15 +104,32 @@ const ENEMY_SPECS: [EnemySpec; 3] = [
                 0.001 / (f - 40. + 1.)
             }
         },
-        ..EnemySpec::default()
+        // ..EnemySpec::default()
     },
     EnemySpec {
         waves: 10,
         image: "enemy3.png",
         health: 50.,
-        size: ENEMY_SIZE * 1.5,
+        size: ENEMY_SIZE * 1.2,
         exp: 50,
-        is_agile: true,
+        more_components: |builder| {
+            builder.insert(Rotation(0.));
+            builder.insert(Target(None));
+            builder.insert(AgileEnemy(true));
+        },
+        freq: |f| (f * 5000. + 10000.) / 10000000.,
+    },
+    EnemySpec {
+        waves: 20,
+        image: "enemy4.png",
+        health: 500.,
+        size: ENEMY_SIZE * 1.5,
+        exp: 500,
+        more_components: |builder| {
+            builder.insert(Rotation(0.));
+            builder.insert(Target(None));
+            builder.insert(SturdyEnemy);
+        },
         freq: |f| (f * 5000. + 10000.) / 10000000.,
     },
 ];
@@ -176,16 +216,13 @@ fn spawn_enemies(
                 })
                 .insert(StageClear)
                 .add_child(sprite);
-            if enemy_spec.is_agile {
-                builder.insert(Rotation(0.));
-                builder.insert(Target(None));
-                builder.insert(AgileEnemy(true));
-            }
+
+            (enemy_spec.more_components)(&mut builder);
         }
     }
 }
 
-pub(crate) fn enemy_system(mut query: Query<&mut Velocity, With<Enemy>>, time: Res<Time>) {
+fn enemy_system(mut query: Query<&mut Velocity, With<Enemy>>, time: Res<Time>) {
     let delta_time = time.delta_seconds();
     for mut velocity in query.iter_mut() {
         velocity.x +=
@@ -194,6 +231,44 @@ pub(crate) fn enemy_system(mut query: Query<&mut Velocity, With<Enemy>>, time: R
             (-velocity.y * 0.005 + (rand::random::<f32>() - 0.5) * 15.) * 100. * delta_time;
         velocity.x *= 1. - 0.2 * delta_time;
         velocity.y *= 1. - 0.2 * delta_time;
+    }
+}
+
+/// Try to find a closest tower and set its Entity to Target component.
+///
+/// This enemy will keep targetting the tower until the tower dies.
+/// We skip searching the towers until we lose current tower which hopefully
+/// helps performance.
+fn try_find_tower<'q, 'a>(
+    position: &Position,
+    target: &mut Target,
+    query_towers: &'q Query<(Entity, &'a Position), With<Tower>>,
+) -> Option<(Entity, &'q Position)> {
+    if let Some((target, position)) = target
+        .0
+        .and_then(|target| Some((target, query_towers.get_component::<Position>(target).ok()?)))
+    {
+        Some((target, position))
+    } else {
+        let new_target = query_towers
+            .iter()
+            .fold(None, |acc, (tower_entity, enemy_position)| {
+                let this_dist = enemy_position.0.distance(position.0);
+                if let Some((prev_dist, _, _)) = acc {
+                    if this_dist < prev_dist {
+                        Some((this_dist, tower_entity, enemy_position))
+                    } else {
+                        acc
+                    }
+                } else {
+                    Some((this_dist, tower_entity, enemy_position))
+                }
+            })
+            .map(|res| (res.1, res.2));
+        if let Some((new_target, _)) = new_target {
+            target.0 = Some(new_target);
+        }
+        new_target
     }
 }
 
@@ -214,32 +289,7 @@ fn agile_enemy_system(
     for (mut velocity, position, mut rotation, mut target, mut bullet_shooter, mut agile_enemy) in
         query.iter_mut()
     {
-        let new_target = if let Some((target, position)) = target
-            .0
-            .and_then(|target| Some((target, query_towers.get_component::<Position>(target).ok()?)))
-        {
-            Some((target, position))
-        } else {
-            let new_target = query_towers
-                .iter()
-                .fold(None, |acc, (tower_entity, enemy_position)| {
-                    let this_dist = enemy_position.0.distance(position.0);
-                    if let Some((prev_dist, _, _)) = acc {
-                        if this_dist < prev_dist {
-                            Some((this_dist, tower_entity, enemy_position))
-                        } else {
-                            acc
-                        }
-                    } else {
-                        Some((this_dist, tower_entity, enemy_position))
-                    }
-                })
-                .map(|res| (res.1, res.2));
-            if let Some((new_target, _)) = new_target {
-                target.0 = Some(new_target);
-            }
-            new_target
-        };
+        let new_target = try_find_tower(position, target.as_mut(), &query_towers);
 
         use std::f64::consts::PI;
         const ANGLE_SPEED: f64 = PI / 50.;
@@ -266,6 +316,45 @@ fn agile_enemy_system(
         }
         velocity.x = (rotation.0.cos() * SPEED) as f32;
         velocity.y = (rotation.0.sin() * SPEED) as f32;
+    }
+}
+
+fn sturdy_enemy_system(
+    mut query: Query<
+        (
+            &mut Velocity,
+            &Position,
+            &mut Rotation,
+            &mut Target,
+            &mut BulletShooter,
+        ),
+        (With<Enemy>, With<SturdyEnemy>),
+    >,
+    query_towers: Query<(Entity, &Position), With<Tower>>,
+) {
+    for (mut velocity, position, mut rotation, mut target, mut bullet_shooter) in query.iter_mut() {
+        let new_target = try_find_tower(position, target.as_mut(), &query_towers);
+
+        use std::f64::consts::PI;
+        const ANGLE_SPEED: f64 = PI / 150.;
+        const SPEED: f64 = 50.;
+        const TOO_CLOSE: f32 = 250.;
+
+        if let Some((_new_target, tower_position)) = new_target {
+            let delta = tower_position.0 - position.0;
+            let target_angle = delta.y.atan2(delta.x) as f64;
+
+            (rotation.0, bullet_shooter.enabled) =
+                apprach_angle(rotation.0, target_angle, ANGLE_SPEED);
+            if TOO_CLOSE.powf(2.) < delta.length_squared() {
+                velocity.x = (rotation.0.cos() * SPEED) as f32;
+                velocity.y = (rotation.0.sin() * SPEED) as f32;
+            } else {
+                **velocity = Vec2::ZERO;
+            }
+        } else {
+            **velocity = Vec2::ZERO;
+        }
     }
 }
 
