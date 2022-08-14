@@ -15,6 +15,7 @@ pub(crate) const ENEMY_SIZE: f32 = 20.;
 const BULLET_SIZE: f32 = 20.;
 
 pub(crate) const SHOOT_INTERVAL: f32 = 0.25;
+const ENEMY_SHOOT_INTERVAL: f32 = 0.5;
 const SHOTGUN_SHOOT_INTERVAL: f32 = 0.75;
 const MISSILE_SHOOT_INTERVAL: f32 = 2.5;
 const BULLET_SPEED: f32 = 500.;
@@ -74,6 +75,7 @@ pub(crate) fn shoot_bullet(
     mut query: Query<(
         Entity,
         &Position,
+        &BulletFilter,
         Option<&Rotation>,
         &mut BulletShooter,
         Option<&Shotgun>,
@@ -82,8 +84,16 @@ pub(crate) fn shoot_bullet(
     )>,
 ) {
     let delta = time.delta_seconds();
-    for (entity, position, rotation, mut bullet_shooter, shotgun, missile_tower, target) in
-        query.iter_mut()
+    for (
+        entity,
+        position,
+        bullet_filter,
+        rotation,
+        mut bullet_shooter,
+        shotgun,
+        missile_tower,
+        target,
+    ) in query.iter_mut()
     {
         if !bullet_shooter.enabled {
             continue;
@@ -114,7 +124,7 @@ pub(crate) fn shoot_bullet(
 
                     let mut builder = commands.spawn();
                     builder.insert(Bullet {
-                        filter: rotation.is_some(),
+                        filter: !bullet_filter.filter,
                         owner: entity,
                         damage: bullet_shooter.damage,
                     });
@@ -163,8 +173,22 @@ pub(crate) fn shoot_bullet(
                         bullet_shooter.cooldown += MISSILE_SHOOT_INTERVAL;
                     }
                 } else {
-                    shoot("bullet.png", rotation.0, BULLET_SPEED, 0., None);
-                    bullet_shooter.cooldown += SHOOT_INTERVAL;
+                    shoot(
+                        if bullet_filter.filter {
+                            "agile-enemy-bullet.png"
+                        } else {
+                            "bullet.png"
+                        },
+                        rotation.0,
+                        BULLET_SPEED,
+                        0.,
+                        None,
+                    );
+                    bullet_shooter.cooldown += if bullet_filter.filter {
+                        ENEMY_SHOOT_INTERVAL
+                    } else {
+                        SHOOT_INTERVAL
+                    };
                 }
             } else {
                 shoot(
@@ -259,8 +283,8 @@ fn single_collision(
                 })
                 .insert(Explosion(Timer::from_seconds(0.15, true)))
                 .insert(StageClear);
-            scoreboard.score += 10.;
-            scoreboard.credits += 10.;
+            scoreboard.score += bullet_filter.exp as f64;
+            scoreboard.credits += bullet_filter.exp as f64;
 
             event_writer.send(GainExpEvent {
                 entity: bullet.owner,

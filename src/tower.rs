@@ -346,6 +346,35 @@ pub(crate) fn update_health_bar(
     }
 }
 
+/// Try to approach the target angle from current angle.
+/// Returns a pair (angle, in_range) where angle is the result angle and in_range is whether
+/// the target is close to the target (thus allowed to shoot).
+pub(super) fn apprach_angle(
+    current_angle: f64,
+    target_angle: f64,
+    angle_speed: f64,
+) -> (f64, bool) {
+    use std::f64::consts::PI;
+    const TWOPI: f64 = PI * 2.;
+
+    let delta_angle = target_angle - current_angle;
+    let wrap_angle = ((delta_angle + PI) - ((delta_angle + PI) / TWOPI).floor() * TWOPI) - PI;
+
+    if wrap_angle.abs() < angle_speed {
+        (target_angle, true)
+    } else if wrap_angle < 0. {
+        (
+            (current_angle - angle_speed) % TWOPI,
+            wrap_angle.abs() < PI / 4.,
+        )
+    } else {
+        (
+            (current_angle + angle_speed) % TWOPI,
+            wrap_angle.abs() < PI / 4.,
+        )
+    }
+}
+
 fn tower_find_target(
     mut query: Query<(&mut Rotation, &Position, &mut BulletShooter, &mut Target), With<Tower>>,
     enemy_query: Query<(Entity, &Position), With<Enemy>>,
@@ -367,7 +396,7 @@ fn tower_find_target(
             });
 
         use std::f64::consts::PI;
-        const TWOPI: f64 = PI * 2.;
+
         const ANGLE_SPEED: f64 = PI / 50.;
 
         if let Some((_, new_target, enemy_position)) = new_target {
@@ -375,19 +404,8 @@ fn tower_find_target(
 
             let delta = enemy_position.0 - position.0;
             let target_angle = delta.y.atan2(delta.x) as f64;
-            let delta_angle = target_angle - rotation.0;
-            let wrap_angle =
-                ((delta_angle + PI) - ((delta_angle + PI) / TWOPI).floor() * TWOPI) - PI;
-            bullet_shooter.enabled = if wrap_angle.abs() < ANGLE_SPEED {
-                rotation.0 = target_angle;
-                true
-            } else if wrap_angle < 0. {
-                rotation.0 = (rotation.0 - ANGLE_SPEED) % TWOPI;
-                wrap_angle.abs() < PI / 4.
-            } else {
-                rotation.0 = (rotation.0 + ANGLE_SPEED) % TWOPI;
-                wrap_angle.abs() < PI / 4.
-            };
+            (rotation.0, bullet_shooter.enabled) =
+                apprach_angle(rotation.0, target_angle, ANGLE_SPEED);
         } else {
             bullet_shooter.enabled = false;
         }

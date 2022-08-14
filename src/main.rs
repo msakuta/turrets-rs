@@ -7,14 +7,13 @@ mod ui;
 
 use crate::{
     bullet::BulletPlugin,
-    enemy::{enemy_system, spawn_enemies, Enemy},
+    enemy::{Enemy, EnemyPlugin},
     mouse::{tower_not_dragging, MousePlugin},
-    save::SaveGameEvent,
+    save::{load_game, save_game, SaveGameEvent},
     tower::{spawn_towers, update_health_bar, Timeout, Tower, TowerPlugin},
     ui::UIPlugin,
 };
 use bevy::prelude::*;
-use save::{load_game, save_game};
 use serde::{Deserialize, Serialize};
 
 const MAX_DIFFICULTY: usize = 5;
@@ -29,14 +28,13 @@ fn main() {
         .add_plugin(TowerPlugin)
         .add_plugin(BulletPlugin)
         .add_plugin(MousePlugin)
+        .add_plugin(EnemyPlugin)
         .add_startup_system(setup)
         .add_system_set(
             SystemSet::new()
                 .with_run_criteria(tower_not_dragging)
                 .with_system(time_level)
                 .with_system(reset_game)
-                .with_system(spawn_enemies)
-                .with_system(enemy_system)
                 .with_system(linear_motion)
                 .with_system(animate_sprite),
         )
@@ -153,7 +151,7 @@ impl Level {
         }
     }
 
-    fn difficulty(&self) -> usize {
+    fn _difficulty(&self) -> usize {
         if let Self::Running { difficulty, .. } = self {
             *difficulty
         } else {
