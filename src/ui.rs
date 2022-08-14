@@ -7,10 +7,7 @@ mod tower_status;
 use bevy::{ecs::system::EntityCommands, prelude::*};
 
 use self::{
-    difficulty_select::{
-        add_difficulty_buttons, difficulty_button_system, difficulty_event_system,
-        show_difficulty_buttons_system,
-    },
+    difficulty_select::{add_difficulty_buttons, DifficultySelectPlugin},
     quit::{add_quit_button, quit_button_system, quit_event_system, show_quit_button_system},
     scoreboard::{add_scoreboard, update_credits, update_level, update_scoreboard},
     tower_palette::{add_palette_buttons, build_tower_palette},
@@ -22,6 +19,7 @@ pub(crate) struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
+        app.add_plugin(DifficultySelectPlugin);
         app.add_event::<StartEvent>();
         app.add_event::<QuitEvent>();
         app.add_startup_system(build_ui);
@@ -34,9 +32,6 @@ impl Plugin for UIPlugin {
         app.add_system(quit_event_system);
         app.add_system(quit_button_system);
         app.add_system(show_quit_button_system);
-        app.add_system(difficulty_button_system);
-        app.add_system(show_difficulty_buttons_system);
-        app.add_system(difficulty_event_system);
     }
 }
 

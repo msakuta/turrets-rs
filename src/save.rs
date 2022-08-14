@@ -133,6 +133,12 @@ pub(crate) fn load_game(
             .ok_or_else(|| MyError("scoreboard is mandatory".to_string()))?;
         *scoreboard = from_value(json_scoreboard)?;
 
+        // Migration from old saves
+        if scoreboard.stages.is_empty() {
+            println!("Migrated!");
+            scoreboard.stages = Scoreboard::stage_scores();
+        }
+
         if let Some(Value::Array(arr)) = json_container.get_mut("towers").map(|t| t.take()) {
             for mut tower in arr {
                 let position = take_or_continue!(tower, "position");

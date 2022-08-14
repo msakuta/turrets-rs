@@ -6,7 +6,7 @@ mod tower;
 mod ui;
 
 use crate::{
-    bullet::{Bullet, BulletPlugin},
+    bullet::BulletPlugin,
     enemy::{enemy_system, spawn_enemies, Enemy},
     mouse::{tower_not_dragging, MousePlugin},
     save::SaveGameEvent,
@@ -32,8 +32,6 @@ fn main() {
             SystemSet::new()
                 .with_run_criteria(tower_not_dragging)
                 .with_system(time_level)
-                .with_system(erase_entities_new_game::<Enemy>)
-                .with_system(erase_entities_new_game::<Bullet>)
                 .with_system(reset_game)
                 .with_system(spawn_enemies)
                 .with_system(enemy_system)
@@ -94,6 +92,8 @@ struct Textures {
 struct Scoreboard {
     score: f64,
     credits: f64,
+    #[serde(default)]
+    stages: Vec<StageScore>,
 }
 
 impl Default for Scoreboard {
@@ -101,8 +101,26 @@ impl Default for Scoreboard {
         Self {
             score: 0.,
             credits: 0.,
+            stages: Self::stage_scores(),
         }
     }
+}
+
+impl Scoreboard {
+    fn stage_scores() -> Vec<StageScore> {
+        (0..3)
+            .map(|difficulty| StageScore {
+                unlocked: difficulty <= 0,
+                high_score: None,
+            })
+            .collect()
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+struct StageScore {
+    unlocked: bool,
+    high_score: Option<f64>,
 }
 
 enum Level {
@@ -184,22 +202,6 @@ fn time_level(mut level: ResMut<Level>, time: Res<Time>) {
 
 struct ClearEvent;
 
-fn erase_entities_new_game<T: Component>(
-    mut commands: Commands,
-    mut reader: EventReader<ClearEvent>,
-    query: Query<Entity, With<T>>,
-) {
-    // We don't care how many events occurred. We only care if it was 0 or more than 0.
-    let had_clear_event = reader.iter().last().is_some();
-
-    if had_clear_event {
-        println!("Clear event read for {:?}", std::any::type_name::<T>());
-        for entity in query.iter() {
-            commands.entity(entity).despawn_recursive();
-        }
-    }
-}
-
 fn reset_game(
     mut commands: Commands,
     mut level: ResMut<Level>,
@@ -225,6 +227,15 @@ fn reset_game(
         if !any_tower {
             spawn_towers(&mut commands, &asset_server);
             scoreboard.score = 0.;
+        } else if let Level::Running { difficulty, .. } = level.as_ref() {
+            let score = scoreboard.score;
+            let high_score = &mut scoreboard.stages[*difficulty].high_score;
+            if high_score
+                .map(|high_score| high_score < score)
+                .unwrap_or(true)
+            {
+                *high_score = Some(score);
+            }
         }
 
         *level = Level::Select;
