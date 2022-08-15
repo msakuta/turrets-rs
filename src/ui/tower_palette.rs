@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 use crate::{
     mouse::{MouseCursor, SelectedTower, SelectedTowerProps},
-    tower::{spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_turret},
+    tower::{spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_turret, Tower},
     Level, Scoreboard,
 };
 
@@ -47,13 +47,13 @@ impl TowerPalette {
         }
     }
 
-    fn cost(&self) -> f64 {
+    fn cost(&self, tower_count: usize) -> f64 {
         // TODO: Scale with the number of existing towers
         match self {
-            Self::Turret => 100.,
-            Self::Shotgun => 150.,
-            Self::Healer => 200.,
-            Self::MissileTower => 350.,
+            Self::Turret => ((1.5f64).powf(tower_count as f64) * 100.).ceil(),
+            Self::Shotgun => ((1.5f64).powf(tower_count as f64) * 150.).ceil(),
+            Self::Healer => ((1.5f64).powf(tower_count as f64) * 200.).ceil(),
+            Self::MissileTower => ((1.5f64).powf(tower_count as f64) * 200.).ceil(),
         }
     }
 }
@@ -133,8 +133,9 @@ fn palette_mouse_system(
     windows: Res<Windows>,
     level: Res<Level>,
     mut scoreboard: ResMut<Scoreboard>,
-    mut query: Query<(&mut Transform, &mut Visibility), With<MouseCursor>>,
-    query_towers: Query<(&Interaction, &Parent, &TowerPalette), Changed<Interaction>>,
+    mut query_mouse: Query<(&mut Transform, &mut Visibility), With<MouseCursor>>,
+    query_towers: Query<&Tower>,
+    query_palette: Query<(&Interaction, &Parent, &TowerPalette), Changed<Interaction>>,
     mut query_ui_color: Query<&mut UiColor>,
     mut selected_tower: ResMut<SelectedTower>,
 ) {
@@ -156,22 +157,25 @@ fn palette_mouse_system(
     let mouse = window.cursor_position();
 
     if let Some(((mut cursor_transform, mut visibility), mouse_position)) =
-        query.get_single_mut().ok().zip(mouse)
+        query_mouse.get_single_mut().ok().zip(mouse)
     {
         let (width, height) = (window.width(), window.height());
         let mouse_screen = Vec2::new(
             mouse_position.x - width / 2.,
             mouse_position.y - height / 2.,
         );
+
+        let tower_count = query_towers.iter().count();
+
         // println!("Mouse: {:?} -> {:?}", mouse_position, mouse_screen);
-        for (interaction, parent, palette) in query_towers.iter() {
+        for (interaction, parent, palette) in query_palette.iter() {
             if let Ok(mut ui_color) = query_ui_color.get_component_mut::<UiColor>(**parent) {
                 // println!("Has ui_color: {ui_color:?}");
                 match *interaction {
                     Interaction::Clicked => {
                         println!("Clicked tower palette at {mouse_screen:?}");
 
-                        let cost = palette.cost();
+                        let cost = palette.cost(tower_count);
                         if scoreboard.credits < cost {
                             return;
                         }
@@ -207,11 +211,13 @@ fn palette_mouse_system(
 }
 
 fn update_palette_system(
+    query_towers: Query<&Tower>,
     mut query: Query<(&mut UiColor, &TowerPalette)>,
     scoreboard: Res<Scoreboard>,
 ) {
+    let tower_count = query_towers.iter().count();
     for (mut color, palette) in query.iter_mut() {
-        *color = if scoreboard.credits < palette.cost() {
+        *color = if scoreboard.credits < palette.cost(tower_count) {
             Color::rgba(0.5, 0.5, 0.5, 0.5).into()
         } else {
             Color::WHITE.into()
@@ -259,7 +265,8 @@ fn add_palette_tooltip_panel(mut commands: Commands, asset_server: Res<AssetServ
 }
 
 fn palette_tooltip_system(
-    query_towers: Query<(&Interaction, &TowerPalette), Changed<Interaction>>,
+    query_towers: Query<&Tower>,
+    query_palette: Query<(&Interaction, &TowerPalette), Changed<Interaction>>,
     mut query_tooltip_visible: Query<&mut Visibility, With<PaletteTooltipText>>,
     mut query_tooltip_tower_type: Query<
         &mut Text,
@@ -270,7 +277,8 @@ fn palette_tooltip_system(
         (With<PaletteTooltipText>, Without<PaletteTooltipTowerType>),
     >,
 ) {
-    for (interaction, palette) in query_towers.iter() {
+    let tower_count = query_towers.iter().count();
+    for (interaction, palette) in query_palette.iter() {
         match *interaction {
             Interaction::Hovered => {
                 for mut visibility in query_tooltip_visible.iter_mut() {
@@ -280,7 +288,7 @@ fn palette_tooltip_system(
                     text.sections[0].value = format!("{:?}", palette);
                 }
                 if let Ok(mut text) = query_tooltip_cost.get_single_mut() {
-                    text.sections[1].value = format!("${}", palette.cost());
+                    text.sections[1].value = format!("${}", palette.cost(tower_count));
                 }
             }
             Interaction::None => {
