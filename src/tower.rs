@@ -14,7 +14,10 @@ use ::serde::{Deserialize, Serialize};
 use bevy::prelude::*;
 use bevy_prototype_lyon::{entity::ShapeBundle, prelude::*, shapes::Circle};
 
-pub(crate) use self::{beam_tower::BeamTower, healer::Healer};
+pub(crate) use self::{
+    beam_tower::{spawn_beam_tower, BeamTower},
+    healer::Healer,
+};
 
 const TOWER_SIZE: f32 = 32.;
 const MISSILE_TOWER_SIZE: f32 = 48.;
@@ -130,6 +133,7 @@ const TOWER_HEALTH: Health = Health::new(10.);
 const SHOTGUN_HEALTH: Health = Health::new(20.);
 const HEALER_HEALTH: Health = Health::new(20.);
 const MISSILE_HEALTH: Health = Health::new(30.);
+const BEAM_TOWER_HEALTH: Health = Health::new(30.);
 
 pub(crate) fn spawn_towers(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     for i in 0..2 {
@@ -266,48 +270,6 @@ pub(crate) fn spawn_healer(
         .insert(healer)
         .add_child(sprite)
         .add_child(shape)
-        .id()
-}
-
-pub(crate) fn spawn_beam_tower(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    position: Vec2,
-    rotation: f64,
-    bundle: TowerInitBundle,
-) -> Entity {
-    let tower = TowerBundle::new(
-        commands,
-        Position(position),
-        Rotation(rotation),
-        MISSILE_TOWER_SIZE,
-        TowerInitBundle {
-            health: Some(bundle.health.unwrap_or(MISSILE_HEALTH)),
-            ..bundle
-        },
-    );
-    let sprite = commands
-        .spawn_bundle(tower_sprite_bundle("beam-tower.png", asset_server, 3.))
-        .id();
-    let beam = commands
-        .spawn_bundle(SpriteBundle {
-            texture: asset_server.load("beam.png"),
-            transform: Transform::from_translation(Vec3::new(500., 0., 0.025))
-                .with_scale(Vec3::new(1000. / 32., 1., 1.)),
-            visibility: Visibility { is_visible: false },
-            ..default()
-        })
-        .id();
-    let shape = commands
-        .spawn_bundle(shape_from_size(MISSILE_TOWER_SIZE))
-        .id();
-    commands
-        .spawn_bundle(tower)
-        .insert(BeamTower::new(beam))
-        .insert_bundle(tower_transform_bundle(position))
-        .add_child(sprite)
-        .add_child(shape)
-        .add_child(beam)
         .id()
 }
 

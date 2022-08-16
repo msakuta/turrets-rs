@@ -1,4 +1,7 @@
-use super::{apprach_angle, Tower, TowerLevel};
+use super::{
+    apprach_angle, shape_from_size, tower_sprite_bundle, tower_transform_bundle, Tower,
+    TowerBundle, TowerInitBundle, TowerLevel, BEAM_TOWER_HEALTH,
+};
 use crate::{
     bullet::GainExpEvent, enemy::Enemy, BulletFilter, Explosion, Health, Position, Rotation,
     StageClear, Target, Textures,
@@ -6,7 +9,9 @@ use crate::{
 use ::serde::{Deserialize, Serialize};
 use bevy::prelude::*;
 
+const BEAM_TOWER_SIZE: f32 = 48.;
 const BEAM_RANGE: f32 = 1000.;
+const BEAM_SPRITE_SIZE: f32 = 32.;
 const SHOOT_DURATION: f32 = 2.;
 const SHOOT_INTERVAL: f32 = 5.;
 
@@ -32,6 +37,46 @@ impl BeamTower {
     pub(crate) fn beam_dps_by_level(level: usize) -> f32 {
         50. * (1.2f32).powf(level as f32)
     }
+}
+
+pub(crate) fn spawn_beam_tower(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    position: Vec2,
+    rotation: f64,
+    bundle: TowerInitBundle,
+) -> Entity {
+    let tower = TowerBundle::new(
+        commands,
+        Position(position),
+        Rotation(rotation),
+        BEAM_TOWER_SIZE,
+        TowerInitBundle {
+            health: Some(bundle.health.unwrap_or(BEAM_TOWER_HEALTH)),
+            ..bundle
+        },
+    );
+    let sprite = commands
+        .spawn_bundle(tower_sprite_bundle("beam-tower.png", asset_server, 3.))
+        .id();
+    let beam = commands
+        .spawn_bundle(SpriteBundle {
+            texture: asset_server.load("beam.png"),
+            transform: Transform::from_translation(Vec3::new(BEAM_RANGE / 2., 0., 0.025))
+                .with_scale(Vec3::new(BEAM_RANGE / BEAM_SPRITE_SIZE, 1., 1.)),
+            visibility: Visibility { is_visible: false },
+            ..default()
+        })
+        .id();
+    let shape = commands.spawn_bundle(shape_from_size(BEAM_TOWER_SIZE)).id();
+    commands
+        .spawn_bundle(tower)
+        .insert(BeamTower::new(beam))
+        .insert_bundle(tower_transform_bundle(position))
+        .add_child(sprite)
+        .add_child(shape)
+        .add_child(beam)
+        .id()
 }
 
 pub(crate) fn beam_tower_find_target(
@@ -119,15 +164,18 @@ pub(crate) fn shoot_beam(
                 continue;
             }
 
-            let dist_to_beam = {
+            let (dist_to_beam, dist_along_beam) = {
                 let delta_vec = target_position.0 - position.0;
                 let beam_direction = Vec2::new(rotation.0.cos() as f32, rotation.0.sin() as f32);
                 let dot = delta_vec.dot(beam_direction);
                 let perpendicular = delta_vec - dot * beam_direction;
-                perpendicular.length()
+                (perpendicular.length(), dot)
             };
 
-            if bullet_filter.radius < dist_to_beam {
+            if bullet_filter.radius < dist_to_beam
+                || dist_along_beam < 0.
+                || BEAM_RANGE < dist_along_beam
+            {
                 continue;
             }
 

@@ -1,7 +1,6 @@
 use super::{Timeout, Tower};
 use crate::{
-    bullet::GainExpEvent, enemy::Enemy, tower::apprach_angle, Health, Position, Rotation, Target,
-    Velocity,
+    bullet::GainExpEvent, tower::apprach_angle, Health, Position, Rotation, Target, Velocity,
 };
 use bevy::prelude::*;
 
@@ -53,7 +52,6 @@ pub(crate) fn healer_find_target(
                 });
 
         use std::f64::consts::PI;
-        const TWOPI: f64 = PI * 2.;
         const ANGLE_SPEED: f64 = PI;
 
         if let Some((_, new_target, enemy_position)) = new_target {
@@ -61,7 +59,6 @@ pub(crate) fn healer_find_target(
 
             let delta = enemy_position.0 - position.0;
             let target_angle = delta.y.atan2(delta.x) as f64;
-            let delta_angle = target_angle - rotation.0;
             (rotation.0, healer.enabled) =
                 apprach_angle(rotation.0, target_angle, ANGLE_SPEED * delta_time as f64);
         } else {

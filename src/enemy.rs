@@ -34,6 +34,7 @@ struct SturdyEnemy;
 const MAX_ENEMIES: usize = 100;
 
 struct EnemySpec {
+    #[allow(dead_code)]
     waves: usize,
     image: &'static str,
     health: f32,
