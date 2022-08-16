@@ -2,7 +2,7 @@ use crate::{
     bullet::{BulletShooter, ENEMY_SIZE},
     mouse::tower_not_dragging,
     sprite_transform_single,
-    tower::{apprach_angle, Tower},
+    tower::{apprach_angle, MissileShooter, Tower},
     BulletFilter, Health, Level, Position, Rotation, StageClear, Target, Velocity,
 };
 use bevy::{ecs::system::EntityCommands, prelude::*};
@@ -17,7 +17,8 @@ impl Plugin for EnemyPlugin {
                 .with_system(spawn_enemies)
                 .with_system(enemy_system)
                 .with_system(agile_enemy_system)
-                .with_system(sturdy_enemy_system),
+                .with_system(sturdy_enemy_system)
+                .with_system(missile_enemy_system),
         );
     }
 }
@@ -39,7 +40,9 @@ struct EnemySpec {
     image: &'static str,
     health: f32,
     size: f32,
+    sprite_scale: f32,
     exp: usize,
+    bullet_damage: f32,
     more_components: fn(&mut EntityCommands),
     freq: fn(f32) -> f32,
 }
@@ -74,13 +77,15 @@ struct EnemySpec {
 //     }
 // }
 
-const ENEMY_SPECS: [EnemySpec; 4] = [
+const ENEMY_SPECS: [EnemySpec; 5] = [
     EnemySpec {
         waves: 0,
         image: "enemy.png",
         health: 10.,
         size: ENEMY_SIZE,
+        sprite_scale: 3.,
         exp: 10,
+        bullet_damage: 1.,
         more_components: |_| (),
         freq: |f| {
             if f < 20. {
@@ -96,7 +101,9 @@ const ENEMY_SPECS: [EnemySpec; 4] = [
         image: "boss.png",
         health: 150.,
         size: ENEMY_SIZE * 2.,
+        sprite_scale: 3.,
         exp: 150,
+        bullet_damage: 1.,
         more_components: |_| (),
         freq: |f| {
             if f < 40. {
@@ -112,7 +119,9 @@ const ENEMY_SPECS: [EnemySpec; 4] = [
         image: "enemy3.png",
         health: 50.,
         size: ENEMY_SIZE * 1.2,
+        sprite_scale: 3.,
         exp: 50,
+        bullet_damage: 1.,
         more_components: |builder| {
             builder.insert(Rotation(0.));
             builder.insert(Target(None));
@@ -125,13 +134,30 @@ const ENEMY_SPECS: [EnemySpec; 4] = [
         image: "enemy4.png",
         health: 500.,
         size: ENEMY_SIZE * 1.5,
+        sprite_scale: 3.,
         exp: 500,
+        bullet_damage: 1.,
         more_components: |builder| {
             builder.insert(Rotation(0.));
             builder.insert(Target(None));
             builder.insert(SturdyEnemy);
         },
         freq: |f| (f * 5000. + 10000.) / 10000000.,
+    },
+    EnemySpec {
+        waves: 20,
+        image: "missile-enemy.png",
+        health: 3500.,
+        size: ENEMY_SIZE * 1.5,
+        sprite_scale: 2.,
+        exp: 3500,
+        bullet_damage: 3.,
+        more_components: |builder| {
+            builder.insert(Rotation(0.));
+            builder.insert(Target(None));
+            builder.insert(MissileShooter);
+        },
+        freq: |f| (f * 5000. + 10000.) / 20000000.,
     },
 ];
 
@@ -192,7 +218,7 @@ fn spawn_enemies(
             let sprite = commands
                 .spawn_bundle(SpriteBundle {
                     texture: asset_server.load(enemy_spec.image),
-                    transform: Transform::from_scale(Vec3::ONE * 3.),
+                    transform: Transform::from_scale(Vec3::splat(enemy_spec.sprite_scale)),
                     ..default()
                 })
                 .id();
@@ -209,7 +235,7 @@ fn spawn_enemies(
                 ))
                 .insert(Enemy)
                 .insert(Health::new(enemy_spec.health))
-                .insert(BulletShooter::new(true, 1.))
+                .insert(BulletShooter::new(true, enemy_spec.bullet_damage))
                 .insert(BulletFilter {
                     filter: true,
                     radius: enemy_spec.size,
@@ -347,6 +373,47 @@ fn sturdy_enemy_system(
 
             (rotation.0, bullet_shooter.enabled) =
                 apprach_angle(rotation.0, target_angle, ANGLE_SPEED);
+            if TOO_CLOSE.powf(2.) < delta.length_squared() {
+                velocity.x = (rotation.0.cos() * SPEED) as f32;
+                velocity.y = (rotation.0.sin() * SPEED) as f32;
+            } else {
+                **velocity = Vec2::ZERO;
+            }
+        } else {
+            **velocity = Vec2::ZERO;
+        }
+    }
+}
+
+fn missile_enemy_system(
+    mut query: Query<
+        (
+            &mut Velocity,
+            &Position,
+            &mut Rotation,
+            &mut Target,
+            &mut BulletShooter,
+        ),
+        (With<Enemy>, With<MissileShooter>),
+    >,
+    query_towers: Query<(Entity, &Position), With<Tower>>,
+    time: Res<Time>,
+) {
+    let delta_time = time.delta_seconds();
+    for (mut velocity, position, mut rotation, mut target, mut bullet_shooter) in query.iter_mut() {
+        let new_target = try_find_tower(position, target.as_mut(), &query_towers);
+
+        use std::f64::consts::PI;
+        const ANGLE_SPEED: f64 = PI / 0.;
+        const SPEED: f64 = 50.;
+        const TOO_CLOSE: f32 = 250.;
+
+        if let Some((_new_target, tower_position)) = new_target {
+            let delta = tower_position.0 - position.0;
+            let target_angle = delta.y.atan2(delta.x) as f64;
+
+            (rotation.0, bullet_shooter.enabled) =
+                apprach_angle(rotation.0, target_angle, ANGLE_SPEED * delta_time as f64);
             if TOO_CLOSE.powf(2.) < delta.length_squared() {
                 velocity.x = (rotation.0.cos() * SPEED) as f32;
                 velocity.y = (rotation.0.sin() * SPEED) as f32;

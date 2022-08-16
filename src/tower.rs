@@ -45,7 +45,7 @@ pub(crate) struct TowerScore {
 pub(crate) struct Shotgun;
 
 #[derive(Component, Serialize, Deserialize)]
-pub(crate) struct MissileTower;
+pub(crate) struct MissileShooter;
 
 #[derive(Component)]
 pub(crate) struct Timeout(f32);
@@ -268,7 +268,7 @@ pub(crate) fn spawn_missile_tower(
         .spawn_bundle(tower)
         .insert_bundle(tower_transform_bundle(position))
         .insert(bullet_shooter)
-        .insert(MissileTower)
+        .insert(MissileShooter)
         .add_child(sprite)
         .add_child(shape)
         .id()
@@ -420,7 +420,7 @@ fn tower_killed_system(
         &mut TowerScore,
         Option<&mut BulletShooter>,
         Option<&mut Healer>,
-        Option<&MissileTower>,
+        Option<&MissileShooter>,
     )>,
     mut reader: EventReader<GainExpEvent>,
 ) {

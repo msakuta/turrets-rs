@@ -1,7 +1,7 @@
 use crate::{
     tower::{
         spawn_beam_tower, spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_turret,
-        BeamTower, Healer, MissileTower, Shotgun, Tower, TowerInitBundle, TowerLevel, TowerScore,
+        BeamTower, Healer, MissileShooter, Shotgun, Tower, TowerInitBundle, TowerLevel, TowerScore,
     },
     Health, Position, Rotation, Scoreboard, MAX_DIFFICULTY,
 };
@@ -33,7 +33,7 @@ pub(crate) fn save_game(
             &Health,
             Option<&Shotgun>,
             Option<&Healer>,
-            Option<&MissileTower>,
+            Option<&MissileShooter>,
             Option<&BeamTower>,
         ),
         With<Tower>,

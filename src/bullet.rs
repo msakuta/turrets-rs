@@ -4,7 +4,7 @@ use self::missile::{missile_system, Missile, MISSILE_SPEED};
 use crate::{
     mouse::tower_not_dragging,
     sprite_transform_single,
-    tower::{MissileTower, Shotgun, Tower},
+    tower::{MissileShooter, Shotgun, Tower},
     BulletFilter, Explosion, Health, Position, Rotation, Scoreboard, StageClear, Target, Textures,
     Velocity,
 };
@@ -79,7 +79,7 @@ pub(crate) fn shoot_bullet(
         Option<&Rotation>,
         &mut BulletShooter,
         Option<&Shotgun>,
-        Option<&MissileTower>,
+        Option<&MissileShooter>,
         Option<&Target>,
     )>,
 ) {
@@ -91,7 +91,7 @@ pub(crate) fn shoot_bullet(
         rotation,
         mut bullet_shooter,
         shotgun,
-        missile_tower,
+        missile_shooter,
         target,
     ) in query.iter_mut()
     {
@@ -111,7 +111,8 @@ pub(crate) fn shoot_bullet(
                             ),
                     );
 
-                    let trail = missile_tower.map(|_| missile::gen_trail(&mut commands, &position));
+                    let trail =
+                        missile_shooter.map(|_| missile::gen_trail(&mut commands, &position));
 
                     sprite_transform_single(&position, Some(&bullet_rotation), &mut transform, 0.);
                     let sprite = commands
@@ -156,7 +157,7 @@ pub(crate) fn shoot_bullet(
                         );
                     }
                     bullet_shooter.cooldown += SHOTGUN_SHOOT_INTERVAL;
-                } else if missile_tower.is_some() {
+                } else if missile_shooter.is_some() {
                     if let Some(target) = target.and_then(|target| target.0) {
                         for i in -2..=2 {
                             if i == 0 {
