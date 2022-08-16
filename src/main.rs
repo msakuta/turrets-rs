@@ -86,6 +86,7 @@ struct Explosion(Timer);
 struct Textures {
     small_explosion: Handle<TextureAtlas>,
     large_explosion: Handle<TextureAtlas>,
+    small_explosion_blue: Handle<TextureAtlas>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -174,6 +175,7 @@ fn setup(
     commands.insert_resource(Textures {
         small_explosion: gen_texture_handle("explode.png", 16., 8),
         large_explosion: gen_texture_handle("explode2.png", 32., 6),
+        small_explosion_blue: gen_texture_handle("explode-blue.png", 16., 8),
     });
 
     let mut scoreboard = Scoreboard::default();

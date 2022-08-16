@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use crate::{
     bullet::BulletShooter,
     mouse::SelectedTower,
-    tower::{tower_max_exp, Healer, TowerLevel, TowerScore},
+    tower::{tower_max_exp, BeamTower, Healer, TowerLevel, TowerScore},
     Health,
 };
 
@@ -150,7 +150,12 @@ fn update_tower_experience(
 
 fn update_tower_damage(
     selected_tower: Res<SelectedTower>,
-    tower_shooter_query: Query<(Option<&BulletShooter>, Option<&Healer>)>,
+    tower_shooter_query: Query<(
+        Option<&BulletShooter>,
+        Option<&Healer>,
+        &TowerLevel,
+        Option<&BeamTower>,
+    )>,
     mut text_query: Query<&mut Text, With<TowerShooterText>>,
 ) {
     if let Ok(mut text) = text_query.get_single_mut() {
@@ -159,13 +164,18 @@ fn update_tower_damage(
             .as_ref()
             .and_then(|tower| tower_shooter_query.get(tower.tower).ok())
         {
-            Some((Some(tower_shooter), None)) => {
+            Some((Some(tower_shooter), None, _, None)) => {
                 text.sections[0].value = "Damage: ".to_string();
                 text.sections[1].value = format!("{:.2}", tower_shooter.damage)
             }
-            Some((None, Some(healer))) => {
+            Some((None, Some(healer), _, None)) => {
                 text.sections[0].value = "Heal: ".to_string();
                 text.sections[1].value = format!("{:.2}", healer.heal_amt);
+            }
+            Some((None, None, level, Some(_))) => {
+                text.sections[0].value = "DPS: ".to_string();
+                text.sections[1].value =
+                    format!("{:.2}", BeamTower::beam_dps_by_level(level.level));
             }
             _ => text.sections[1].value = "".to_string(),
         }

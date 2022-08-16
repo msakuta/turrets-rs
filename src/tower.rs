@@ -1,6 +1,10 @@
+mod beam_tower;
 mod healer;
 
-use self::healer::{heal_target, healer_find_target};
+use self::{
+    beam_tower::{beam_tower_find_target, shoot_beam},
+    healer::{heal_target, healer_find_target},
+};
 use crate::{
     bullet::{BulletShooter, GainExpEvent},
     mouse::tower_not_dragging,
@@ -10,7 +14,7 @@ use ::serde::{Deserialize, Serialize};
 use bevy::prelude::*;
 use bevy_prototype_lyon::{entity::ShapeBundle, prelude::*, shapes::Circle};
 
-pub(crate) use healer::Healer;
+pub(crate) use self::{beam_tower::BeamTower, healer::Healer};
 
 const TOWER_SIZE: f32 = 32.;
 const MISSILE_TOWER_SIZE: f32 = 48.;
@@ -114,6 +118,8 @@ impl Plugin for TowerPlugin {
                 .with_system(tower_find_target)
                 .with_system(healer_find_target)
                 .with_system(heal_target)
+                .with_system(beam_tower_find_target)
+                .with_system(shoot_beam)
                 .with_system(timeout),
         );
         app.add_system(tower_killed_system);
@@ -263,6 +269,48 @@ pub(crate) fn spawn_healer(
         .id()
 }
 
+pub(crate) fn spawn_beam_tower(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    position: Vec2,
+    rotation: f64,
+    bundle: TowerInitBundle,
+) -> Entity {
+    let tower = TowerBundle::new(
+        commands,
+        Position(position),
+        Rotation(rotation),
+        MISSILE_TOWER_SIZE,
+        TowerInitBundle {
+            health: Some(bundle.health.unwrap_or(MISSILE_HEALTH)),
+            ..bundle
+        },
+    );
+    let sprite = commands
+        .spawn_bundle(tower_sprite_bundle("beam-tower.png", asset_server, 3.))
+        .id();
+    let beam = commands
+        .spawn_bundle(SpriteBundle {
+            texture: asset_server.load("beam.png"),
+            transform: Transform::from_translation(Vec3::new(500., 0., 0.025))
+                .with_scale(Vec3::new(1000. / 32., 1., 1.)),
+            visibility: Visibility { is_visible: false },
+            ..default()
+        })
+        .id();
+    let shape = commands
+        .spawn_bundle(shape_from_size(MISSILE_TOWER_SIZE))
+        .id();
+    commands
+        .spawn_bundle(tower)
+        .insert(BeamTower::new(beam))
+        .insert_bundle(tower_transform_bundle(position))
+        .add_child(sprite)
+        .add_child(shape)
+        .add_child(beam)
+        .id()
+}
+
 pub(crate) fn spawn_missile_tower(
     commands: &mut Commands,
     asset_server: &AssetServer,
@@ -378,7 +426,9 @@ pub(super) fn apprach_angle(
 fn tower_find_target(
     mut query: Query<(&mut Rotation, &Position, &mut BulletShooter, &mut Target), With<Tower>>,
     enemy_query: Query<(Entity, &Position), With<Enemy>>,
+    time: Res<Time>,
 ) {
+    let delta_time = time.delta_seconds();
     for (mut rotation, position, mut bullet_shooter, mut target) in query.iter_mut() {
         let new_target = enemy_query
             .iter()
@@ -397,7 +447,7 @@ fn tower_find_target(
 
         use std::f64::consts::PI;
 
-        const ANGLE_SPEED: f64 = PI / 50.;
+        const ANGLE_SPEED: f64 = PI;
 
         if let Some((_, new_target, enemy_position)) = new_target {
             target.0 = Some(new_target);
@@ -405,7 +455,7 @@ fn tower_find_target(
             let delta = enemy_position.0 - position.0;
             let target_angle = delta.y.atan2(delta.x) as f64;
             (rotation.0, bullet_shooter.enabled) =
-                apprach_angle(rotation.0, target_angle, ANGLE_SPEED);
+                apprach_angle(rotation.0, target_angle, ANGLE_SPEED * delta_time as f64);
         } else {
             bullet_shooter.enabled = false;
         }

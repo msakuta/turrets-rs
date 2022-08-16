@@ -2,7 +2,9 @@ use bevy::prelude::*;
 
 use crate::{
     mouse::{MouseCursor, SelectedTower, SelectedTowerProps},
-    tower::{spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_turret, Tower},
+    tower::{
+        spawn_beam_tower, spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_turret, Tower,
+    },
     Level, Scoreboard,
 };
 
@@ -27,6 +29,7 @@ enum TowerPalette {
     Turret,
     Shotgun,
     Healer,
+    BeamTower,
     MissileTower,
 }
 
@@ -41,6 +44,7 @@ impl TowerPalette {
             Self::Turret => spawn_turret(commands, asset_server, position, 0., default()),
             Self::Shotgun => spawn_shotgun(commands, asset_server, position, 0., default()),
             Self::Healer => spawn_healer(commands, asset_server, position, 0., default()),
+            Self::BeamTower => spawn_beam_tower(commands, asset_server, position, 0., default()),
             Self::MissileTower => {
                 spawn_missile_tower(commands, asset_server, position, 0., default())
             }
@@ -48,11 +52,11 @@ impl TowerPalette {
     }
 
     fn cost(&self, tower_count: usize) -> f64 {
-        // TODO: Scale with the number of existing towers
         match self {
             Self::Turret => ((1.5f64).powf(tower_count as f64) * 100.).ceil(),
             Self::Shotgun => ((1.5f64).powf(tower_count as f64) * 150.).ceil(),
             Self::Healer => ((1.5f64).powf(tower_count as f64) * 200.).ceil(),
+            Self::BeamTower => ((1.5f64).powf(tower_count as f64) * 350.).ceil(),
             Self::MissileTower => ((1.5f64).powf(tower_count as f64) * 200.).ceil(),
         }
     }
@@ -85,6 +89,12 @@ pub(super) fn add_palette_buttons(commands: &mut Commands, asset_server: &Res<As
             add_tower_icon(parent, &asset_server, "turret.png", TowerPalette::Turret);
             add_tower_icon(parent, &asset_server, "shotgun.png", TowerPalette::Shotgun);
             add_tower_icon(parent, &asset_server, "healer.png", TowerPalette::Healer);
+            add_tower_icon(
+                parent,
+                &asset_server,
+                "beam-tower.png",
+                TowerPalette::BeamTower,
+            );
             add_tower_icon(
                 parent,
                 &asset_server,

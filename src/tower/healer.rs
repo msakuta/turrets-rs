@@ -1,5 +1,8 @@
 use super::{Timeout, Tower};
-use crate::{bullet::GainExpEvent, Health, Position, Rotation, Target, Velocity};
+use crate::{
+    bullet::GainExpEvent, enemy::Enemy, tower::apprach_angle, Health, Position, Rotation, Target,
+    Velocity,
+};
 use bevy::prelude::*;
 
 const HEALER_RANGE: f32 = 300.;
@@ -25,7 +28,9 @@ impl Healer {
 pub(crate) fn healer_find_target(
     mut query: Query<(Entity, &mut Rotation, &Position, &mut Healer, &mut Target), With<Tower>>,
     mut friend_query: Query<(Entity, &Position, &Health), With<Tower>>,
+    time: Res<Time>,
 ) {
+    let delta_time = time.delta_seconds();
     for (entity, mut rotation, position, mut healer, mut target) in query.iter_mut() {
         let new_target =
             friend_query
@@ -49,7 +54,7 @@ pub(crate) fn healer_find_target(
 
         use std::f64::consts::PI;
         const TWOPI: f64 = PI * 2.;
-        const ANGLE_SPEED: f64 = PI / 50.;
+        const ANGLE_SPEED: f64 = PI;
 
         if let Some((_, new_target, enemy_position)) = new_target {
             target.0 = Some(new_target);
@@ -57,18 +62,8 @@ pub(crate) fn healer_find_target(
             let delta = enemy_position.0 - position.0;
             let target_angle = delta.y.atan2(delta.x) as f64;
             let delta_angle = target_angle - rotation.0;
-            let wrap_angle =
-                ((delta_angle + PI) - ((delta_angle + PI) / TWOPI).floor() * TWOPI) - PI;
-            healer.enabled = if wrap_angle.abs() < ANGLE_SPEED {
-                rotation.0 = target_angle;
-                true
-            } else if wrap_angle < 0. {
-                rotation.0 = (rotation.0 - ANGLE_SPEED) % TWOPI;
-                wrap_angle.abs() < PI / 4.
-            } else {
-                rotation.0 = (rotation.0 + ANGLE_SPEED) % TWOPI;
-                wrap_angle.abs() < PI / 4.
-            };
+            (rotation.0, healer.enabled) =
+                apprach_angle(rotation.0, target_angle, ANGLE_SPEED * delta_time as f64);
         } else {
             healer.enabled = false;
         }

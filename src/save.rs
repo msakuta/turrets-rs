@@ -1,7 +1,7 @@
 use crate::{
     tower::{
-        spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_turret, Healer, MissileTower,
-        Shotgun, Tower, TowerInitBundle, TowerLevel, TowerScore,
+        spawn_beam_tower, spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_turret,
+        BeamTower, Healer, MissileTower, Shotgun, Tower, TowerInitBundle, TowerLevel, TowerScore,
     },
     Health, Position, Rotation, Scoreboard, MAX_DIFFICULTY,
 };
@@ -34,6 +34,7 @@ pub(crate) fn save_game(
             Option<&Shotgun>,
             Option<&Healer>,
             Option<&MissileTower>,
+            Option<&BeamTower>,
         ),
         With<Tower>,
     >,
@@ -43,9 +44,9 @@ pub(crate) fn save_game(
         println!("Save event");
 
         match (|| -> Result<(), MyError> {
-            let json_towers = query.iter().map(|(position, rotation, tower_score, tower_level, health, shotgun, healer, missile_tower)| -> Result<serde_json::Value, MyError>{
+            let json_towers = query.iter().map(|(position, rotation, tower_score, tower_level, health, shotgun, healer, missile_tower, beam_tower)| -> Result<serde_json::Value, MyError>{
                 Ok(json!({
-                    "type": if shotgun.is_some() { "Shotgun" } else if healer.is_some() { "Healer" } else if missile_tower.is_some() { "MissileTower" } else { "Turret"},
+                    "type": if shotgun.is_some() { "Shotgun" } else if healer.is_some() { "Healer" } else if missile_tower.is_some() { "MissileTower" } else if beam_tower.is_some() { "BeamTower" } else { "Turret"},
                     "tower_score": tower_score,
                     "tower_level": tower_level,
                     "position": position,
@@ -189,6 +190,15 @@ pub(crate) fn load_game(
                     }
                     "MissileTower" => {
                         spawn_missile_tower(
+                            commands,
+                            asset_server,
+                            serde_json::from_value(position)?,
+                            serde_json::from_value(rotation)?,
+                            bundle,
+                        );
+                    }
+                    "BeamTower" => {
+                        spawn_beam_tower(
                             commands,
                             asset_server,
                             serde_json::from_value(position)?,
