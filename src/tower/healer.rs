@@ -1,4 +1,7 @@
-use super::{Timeout, Tower};
+use super::{
+    heal_amt_by_level, shape_from_size, tower_sprite_bundle, tower_transform_bundle, Timeout,
+    Tower, TowerBundle, TowerInitBundle, HEALER_HEALTH, TOWER_SIZE,
+};
 use crate::{
     bullet::GainExpEvent, tower::apprach_angle, Health, Position, Rotation, Target, Velocity,
 };
@@ -22,6 +25,39 @@ impl Healer {
             heal_amt,
         }
     }
+}
+
+pub(crate) fn spawn_healer(
+    commands: &mut Commands,
+    asset_server: &AssetServer,
+    position: Vec2,
+    rotation: f64,
+    bundle: TowerInitBundle,
+) -> Entity {
+    let healer = Healer::new_with_heal_amt(heal_amt_by_level(
+        bundle.tower_level.as_ref().map(|l| l.level).unwrap_or(0),
+    ));
+    let tower = TowerBundle::new(
+        commands,
+        Position(position),
+        Rotation(rotation),
+        TOWER_SIZE,
+        TowerInitBundle {
+            health: Some(bundle.health.unwrap_or(HEALER_HEALTH)),
+            ..bundle
+        },
+    );
+    let sprite = commands
+        .spawn_bundle(tower_sprite_bundle("healer.png", asset_server, 3.))
+        .id();
+    let shape = commands.spawn_bundle(shape_from_size(TOWER_SIZE)).id();
+    commands
+        .spawn_bundle(tower)
+        .insert_bundle(tower_transform_bundle(position))
+        .insert(healer)
+        .add_child(sprite)
+        .add_child(shape)
+        .id()
 }
 
 pub(crate) fn healer_find_target(

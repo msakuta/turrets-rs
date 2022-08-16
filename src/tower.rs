@@ -16,7 +16,7 @@ use bevy_prototype_lyon::{entity::ShapeBundle, prelude::*, shapes::Circle};
 
 pub(crate) use self::{
     beam_tower::{spawn_beam_tower, BeamTower},
-    healer::Healer,
+    healer::{spawn_healer, Healer},
 };
 
 const TOWER_SIZE: f32 = 32.;
@@ -235,39 +235,6 @@ pub(crate) fn spawn_shotgun(
         .insert_bundle(tower_transform_bundle(position))
         .insert(bullet_shooter)
         .insert(Shotgun)
-        .add_child(sprite)
-        .add_child(shape)
-        .id()
-}
-
-pub(crate) fn spawn_healer(
-    commands: &mut Commands,
-    asset_server: &AssetServer,
-    position: Vec2,
-    rotation: f64,
-    bundle: TowerInitBundle,
-) -> Entity {
-    let healer = Healer::new_with_heal_amt(heal_amt_by_level(
-        bundle.tower_level.as_ref().map(|l| l.level).unwrap_or(0),
-    ));
-    let tower = TowerBundle::new(
-        commands,
-        Position(position),
-        Rotation(rotation),
-        TOWER_SIZE,
-        TowerInitBundle {
-            health: Some(bundle.health.unwrap_or(HEALER_HEALTH)),
-            ..bundle
-        },
-    );
-    let sprite = commands
-        .spawn_bundle(tower_sprite_bundle("healer.png", asset_server, 3.))
-        .id();
-    let shape = commands.spawn_bundle(shape_from_size(TOWER_SIZE)).id();
-    commands
-        .spawn_bundle(tower)
-        .insert_bundle(tower_transform_bundle(position))
-        .insert(healer)
         .add_child(sprite)
         .add_child(shape)
         .id()
