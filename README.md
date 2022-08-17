@@ -10,6 +10,8 @@ And I feel limited in maintaining JavaScript project as it scales.
 
 It uses [Bevy](https://bevyengine.org/) game engine.
 
+![screenshot](screenshots/screenshot.jpg)
+
 ## Game state
 
 The game state is saved to:

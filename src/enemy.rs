@@ -145,7 +145,7 @@ const ENEMY_SPECS: [EnemySpec; 5] = [
         freq: |f| (f * 5000. + 10000.) / 10000000.,
     },
     EnemySpec {
-        waves: 20,
+        waves: 40,
         image: "missile-enemy.png",
         health: 3500.,
         size: ENEMY_SIZE * 1.5,
