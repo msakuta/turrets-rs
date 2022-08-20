@@ -34,10 +34,11 @@ fn main() {
             SystemSet::new()
                 .with_run_criteria(tower_not_dragging)
                 .with_system(time_level)
-                .with_system(reset_game)
+                .with_system(timeout_level)
                 .with_system(linear_motion)
                 .with_system(animate_sprite),
         )
+        .add_system(reset_game)
         .add_system(sprite_transform)
         .add_system(update_health_bar)
         .add_system(save_game)
@@ -204,16 +205,23 @@ fn time_level(mut level: ResMut<Level>, time: Res<Time>) {
 
 struct ClearEvent;
 
+fn timeout_level(level: ResMut<Level>, mut writer: EventWriter<ClearEvent>) {
+    if level.timer_finished() {
+        writer.send(ClearEvent);
+    }
+}
+
 fn reset_game(
     mut commands: Commands,
     mut level: ResMut<Level>,
     query: Query<Entity, With<StageClear>>,
     mut query_towers: Query<&mut Health, With<Tower>>,
+    mut reader: EventReader<ClearEvent>,
     mut writer: EventWriter<SaveGameEvent>,
     mut scoreboard: ResMut<Scoreboard>,
     asset_server: Res<AssetServer>,
 ) {
-    if level.timer_finished() {
+    if reader.iter().next().is_some() {
         println!("Round finished!");
         for entity in query.iter() {
             commands.entity(entity).despawn_recursive();
