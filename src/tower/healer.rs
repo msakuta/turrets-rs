@@ -1,6 +1,6 @@
 use super::{
-    heal_amt_by_level, shape_from_size, tower_sprite_bundle, tower_transform_bundle, Timeout,
-    Tower, TowerBundle, TowerInitBundle, HEALER_HEALTH, TOWER_SIZE,
+    heal_amt_by_level, shape_from_size, tower_sprite_bundle, tower_transform_bundle, TempEnt,
+    Timeout, Tower, TowerBundle, TowerInitBundle, HEALER_HEALTH, TOWER_SIZE,
 };
 use crate::{
     bullet::GainExpEvent, tower::apprach_angle, Health, Position, Rotation, Target, Velocity,
@@ -142,7 +142,8 @@ pub(crate) fn heal_target(
                         })
                         .insert(Position(target_position.0))
                         .insert(Velocity(Vec2::new(0., 5.)))
-                        .insert(Timeout(HEALER_INTERVAL));
+                        .insert(Timeout(HEALER_INTERVAL))
+                        .insert(TempEnt);
 
                     let delta = position.0 - target_position.0;
                     let centroid = (position.0 + target_position.0) / 2.;
@@ -160,7 +161,8 @@ pub(crate) fn heal_target(
                             .with_rotation(Quat::from_rotation_z(delta.y.atan2(delta.x))),
                             ..default()
                         })
-                        .insert(Timeout(HEALER_INTERVAL / 2.));
+                        .insert(Timeout(HEALER_INTERVAL / 2.))
+                        .insert(TempEnt);
                     continue;
                 }
             }

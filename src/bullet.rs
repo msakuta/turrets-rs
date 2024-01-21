@@ -4,7 +4,7 @@ use self::missile::{missile_system, Missile, MISSILE_SPEED};
 use crate::{
     mouse::tower_not_dragging,
     sprite_transform_single,
-    tower::{MissileShooter, Shotgun, Tower},
+    tower::{MissileShooter, Shotgun, TempEnt, Tower},
     BulletFilter, Explosion, Health, Position, Rotation, Scoreboard, StageClear, Target, Textures,
     Velocity,
 };
@@ -283,7 +283,8 @@ fn single_collision(
                     ..default()
                 })
                 .insert(Explosion(Timer::from_seconds(0.15, true)))
-                .insert(StageClear);
+                .insert(StageClear)
+                .insert(TempEnt);
             scoreboard.score += bullet_filter.exp as f64;
             scoreboard.credits += bullet_filter.exp as f64;
 
@@ -303,7 +304,8 @@ fn single_collision(
                 ..default()
             })
             .insert(Explosion(Timer::from_seconds(0.06, true)))
-            .insert(StageClear);
+            .insert(StageClear)
+            .insert(TempEnt);
     }
 }
 

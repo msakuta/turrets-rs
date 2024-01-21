@@ -50,6 +50,10 @@ pub(crate) struct MissileShooter;
 #[derive(Component)]
 pub(crate) struct Timeout(f32);
 
+/// Indicates temporary entities
+#[derive(Component)]
+pub(crate) struct TempEnt;
+
 #[derive(Bundle)]
 pub(crate) struct TowerBundle {
     position: Position,

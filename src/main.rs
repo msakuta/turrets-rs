@@ -15,6 +15,7 @@ use crate::{
 };
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
+use tower::TempEnt;
 
 const MAX_DIFFICULTY: usize = 5;
 
@@ -268,15 +269,15 @@ fn sprite_transform(
         &Position,
         Option<&Rotation>,
         &mut Transform,
-        Option<&Timeout>,
+        Option<&TempEnt>,
     )>,
 ) {
-    for (position, rotation, mut transform, timeout) in query.iter_mut() {
+    for (position, rotation, mut transform, temp_ent) in query.iter_mut() {
         sprite_transform_single(
             position,
             rotation,
             transform.as_mut(),
-            if timeout.is_some() { 0.1 } else { 0.05 },
+            if temp_ent.is_some() { 0.75 } else { 0.05 },
         );
     }
 }
