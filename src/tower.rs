@@ -7,7 +7,7 @@ use self::{
 };
 use crate::{
     bullet::{BulletShooter, GainExpEvent},
-    can_update, BulletFilter, Enemy, Health, Position, Rotation, Target,
+    can_update, BulletFilter, Enemy, Health, Position, Rotation, Target, Textures,
 };
 use ::serde::{Deserialize, Serialize};
 use bevy::prelude::*;
@@ -98,17 +98,23 @@ impl TowerBundle {
     }
 }
 
-fn shape_from_size(size: f32) -> ShapeBundle {
+fn tower_circle(size: f32, textures: &Textures) -> ShapeBundle {
     let line = Circle {
         radius: size,
         center: Vec2::ZERO,
     };
 
-    GeometryBuilder::build_as(
-        &line,
-        DrawMode::Stroke(StrokeMode::new(Color::rgba(0.0, 0.8, 0.8, 1.), 1.0)),
-        Transform::from_xyz(0., 0., 0.05),
-    )
+    // let geom = GeometryBuilder::build_as(
+    //     &line,
+    //     // DrawMode::Stroke(StrokeMode::new(Color::rgba(0.0, 0.8, 0.8, 1.), 1.0)),
+    //     // Transform::from_xyz(0., 0., 0.05),
+    // );
+
+    ShapeBundle {
+        path: GeometryBuilder::build_as(&line),
+        material: textures.tower_circle_material.clone(),
+        ..default()
+    }
 }
 
 #[derive(Component)]
@@ -118,17 +124,20 @@ pub(crate) struct TowerPlugin;
 
 impl Plugin for TowerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(update_health_bar).add_system_set(
-            SystemSet::new()
-                .with_run_criteria(can_update)
-                .with_system(tower_find_target)
-                .with_system(healer_find_target)
-                .with_system(heal_target)
-                .with_system(beam_tower_find_target)
-                .with_system(shoot_beam)
-                .with_system(timeout),
+        app.add_systems(Update, update_health_bar);
+        app.add_systems(
+            Update,
+            (
+                tower_find_target,
+                healer_find_target,
+                heal_target,
+                beam_tower_find_target,
+                shoot_beam,
+                timeout,
+            )
+                .run_if(can_update),
         );
-        app.add_system(tower_killed_system);
+        app.add_systems(Update, tower_killed_system);
     }
 }
 
@@ -138,7 +147,11 @@ const HEALER_HEALTH: Health = Health::new(20.);
 const MISSILE_HEALTH: Health = Health::new(30.);
 const BEAM_TOWER_HEALTH: Health = Health::new(30.);
 
-pub(crate) fn spawn_towers(commands: &mut Commands, asset_server: &Res<AssetServer>) {
+pub(crate) fn spawn_towers(
+    commands: &mut Commands,
+    asset_server: &Res<AssetServer>,
+    textures: &Textures,
+) {
     for i in 0..2 {
         spawn_turret(
             commands,
@@ -146,6 +159,7 @@ pub(crate) fn spawn_towers(commands: &mut Commands, asset_server: &Res<AssetServ
             Vec2::new(i as f32 * 200.0 - 100., 0.0),
             i as f64 * std::f64::consts::PI * 2. / 3.,
             default(),
+            textures,
         );
     }
 }
@@ -164,7 +178,11 @@ fn bullet_shooter_from_level(tower_level: &Option<TowerLevel>, missile: bool) ->
     )
 }
 
-fn tower_sprite_bundle(texture_name: &str, asset_server: &AssetServer, scale: f32) -> SpriteBundle {
+fn tower_sprite_bundle(
+    texture_name: &'static str,
+    asset_server: &AssetServer,
+    scale: f32,
+) -> SpriteBundle {
     SpriteBundle {
         texture: asset_server.load(texture_name),
         transform: Transform::from_translation(Vec3::new(0., 0., 0.1))
@@ -186,6 +204,7 @@ pub(crate) fn spawn_turret(
     position: Vec2,
     rotation: f64,
     bundle: TowerInitBundle,
+    textures: &Textures,
 ) -> Entity {
     let bullet_shooter = bullet_shooter_from_level(&bundle.tower_level, false);
     let tower = TowerBundle::new(
@@ -199,12 +218,12 @@ pub(crate) fn spawn_turret(
         },
     );
     let sprite = commands
-        .spawn_bundle(tower_sprite_bundle("turret.png", asset_server, 3.))
+        .spawn(tower_sprite_bundle("turret.png", asset_server, 3.))
         .id();
-    let shape = commands.spawn_bundle(shape_from_size(TOWER_SIZE)).id();
+    let shape = commands.spawn(tower_circle(TOWER_SIZE, textures)).id();
     commands
-        .spawn_bundle(tower)
-        .insert_bundle(tower_transform_bundle(position))
+        .spawn(tower)
+        .insert(tower_transform_bundle(position))
         .insert(bullet_shooter)
         .add_child(sprite)
         .add_child(shape)
@@ -217,6 +236,7 @@ pub(crate) fn spawn_shotgun(
     position: Vec2,
     rotation: f64,
     bundle: TowerInitBundle,
+    textures: &Textures,
 ) -> Entity {
     let bullet_shooter = bullet_shooter_from_level(&bundle.tower_level, false);
     let tower = TowerBundle::new(
@@ -230,12 +250,12 @@ pub(crate) fn spawn_shotgun(
         },
     );
     let sprite = commands
-        .spawn_bundle(tower_sprite_bundle("shotgun.png", asset_server, 3.))
+        .spawn(tower_sprite_bundle("shotgun.png", asset_server, 3.))
         .id();
-    let shape = commands.spawn_bundle(shape_from_size(TOWER_SIZE)).id();
+    let shape = commands.spawn(tower_circle(TOWER_SIZE, textures)).id();
     commands
-        .spawn_bundle(tower)
-        .insert_bundle(tower_transform_bundle(position))
+        .spawn(tower)
+        .insert(tower_transform_bundle(position))
         .insert(bullet_shooter)
         .insert(Shotgun)
         .add_child(sprite)
@@ -249,6 +269,7 @@ pub(crate) fn spawn_missile_tower(
     position: Vec2,
     rotation: f64,
     bundle: TowerInitBundle,
+    textures: &Textures,
 ) -> Entity {
     let bullet_shooter = bullet_shooter_from_level(&bundle.tower_level, true);
     let tower = TowerBundle::new(
@@ -262,14 +283,14 @@ pub(crate) fn spawn_missile_tower(
         },
     );
     let sprite = commands
-        .spawn_bundle(tower_sprite_bundle("missile-tower.png", asset_server, 3.))
+        .spawn(tower_sprite_bundle("missile-tower.png", asset_server, 3.))
         .id();
     let shape = commands
-        .spawn_bundle(shape_from_size(MISSILE_TOWER_SIZE))
+        .spawn(tower_circle(MISSILE_TOWER_SIZE, textures))
         .id();
     commands
-        .spawn_bundle(tower)
-        .insert_bundle(tower_transform_bundle(position))
+        .spawn(tower)
+        .insert(tower_transform_bundle(position))
         .insert(bullet_shooter)
         .insert(MissileShooter)
         .add_child(sprite)
@@ -282,7 +303,7 @@ const HEALTH_BAR_WIDTH: f32 = 80.;
 fn health_bar(commands: &mut Commands) -> (Entity, Entity) {
     (
         commands
-            .spawn_bundle(SpriteBundle {
+            .spawn(SpriteBundle {
                 sprite: Sprite {
                     color: Color::rgb(0.25, 1., 0.25),
                     custom_size: Some(Vec2::new(HEALTH_BAR_WIDTH, 10.0)),
@@ -293,7 +314,7 @@ fn health_bar(commands: &mut Commands) -> (Entity, Entity) {
             .insert(TowerHealthBar)
             .id(),
         commands
-            .spawn_bundle(SpriteBundle {
+            .spawn(SpriteBundle {
                 sprite: Sprite {
                     color: Color::rgb(1.0, 0., 0.),
                     custom_size: Some(Vec2::new(HEALTH_BAR_WIDTH, 10.0)),
@@ -427,7 +448,7 @@ fn tower_killed_system(
     )>,
     mut reader: EventReader<GainExpEvent>,
 ) {
-    for event in reader.iter() {
+    for event in reader.read() {
         if let Ok((
             mut tower,
             mut health,

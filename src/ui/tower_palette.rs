@@ -1,11 +1,11 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, window::PrimaryWindow};
 
 use crate::{
     mouse::{MouseCursor, SelectedTower, SelectedTowerProps},
     tower::{
         spawn_beam_tower, spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_turret, Tower,
     },
-    Level, Scoreboard,
+    Level, Scoreboard, Textures,
 };
 
 use super::{
@@ -16,12 +16,17 @@ use super::{
 use std::iter::Iterator;
 
 pub(super) fn build_tower_palette(app: &mut App) {
-    app.add_startup_system(add_palette_tooltip_panel);
-    app.add_startup_system(add_trashcan_hint_panel);
-    app.add_system(palette_mouse_system);
-    app.add_system(update_palette_system);
-    app.add_system(palette_tooltip_system);
-    app.add_system(trashcan_tooltip_system);
+    app.add_systems(Startup, add_palette_tooltip_panel);
+    app.add_systems(Startup, add_trashcan_hint_panel);
+    app.add_systems(
+        Update,
+        (
+            palette_mouse_system,
+            update_palette_system,
+            palette_tooltip_system,
+            trashcan_tooltip_system,
+        ),
+    );
 }
 
 #[derive(Component, Debug)]
@@ -39,14 +44,19 @@ impl TowerPalette {
         commands: &mut Commands,
         asset_server: &Res<AssetServer>,
         position: Vec2,
+        textures: &Textures,
     ) -> Entity {
         match self {
-            Self::Turret => spawn_turret(commands, asset_server, position, 0., default()),
-            Self::Shotgun => spawn_shotgun(commands, asset_server, position, 0., default()),
-            Self::Healer => spawn_healer(commands, asset_server, position, 0., default()),
-            Self::BeamTower => spawn_beam_tower(commands, asset_server, position, 0., default()),
+            Self::Turret => spawn_turret(commands, asset_server, position, 0., default(), textures),
+            Self::Shotgun => {
+                spawn_shotgun(commands, asset_server, position, 0., default(), textures)
+            }
+            Self::Healer => spawn_healer(commands, asset_server, position, 0., default(), textures),
+            Self::BeamTower => {
+                spawn_beam_tower(commands, asset_server, position, 0., default(), textures)
+            }
             Self::MissileTower => {
-                spawn_missile_tower(commands, asset_server, position, 0., default())
+                spawn_missile_tower(commands, asset_server, position, 0., default(), textures)
             }
         }
     }
@@ -67,22 +77,20 @@ struct TowerTrashcan;
 
 pub(super) fn add_palette_buttons(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
-                size: Size::new(Val::Px(PALETTE_SIZE), Val::Percent(100.0)),
-                margin: Rect::all(Val::Auto),
+                width: Val::Px(PALETTE_SIZE),
+                height: Val::Percent(100.0),
+                margin: UiRect::all(Val::Auto),
                 justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::FlexStart,
                 flex_direction: FlexDirection::ColumnReverse,
                 position_type: PositionType::Absolute,
-                position: Rect {
-                    top: Val::Px(PADDING * 2. + BUTTON_HEIGHT),
-                    right: PADDING_PX,
-                    ..default()
-                },
+                top: Val::Px(PADDING * 2. + BUTTON_HEIGHT),
+                right: PADDING_PX,
                 ..default()
             },
-            color: Color::NONE.into(),
+            background_color: Color::NONE.into(),
             ..default()
         })
         .with_children(|parent| {
@@ -107,29 +115,32 @@ pub(super) fn add_palette_buttons(commands: &mut Commands, asset_server: &Res<As
 fn add_tower_icon(
     parent: &mut ChildBuilder,
     asset_server: &Res<AssetServer>,
-    file: &str,
+    file: &'static str,
     tower_palette: impl Component,
 ) {
+    let asset = asset_server.load(file);
     parent
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
-                size: Size::new(Val::Px(PALETTE_SIZE), Val::Px(PALETTE_SIZE)),
-                border: Rect::all(Val::Px(2.0)),
+                width: Val::Px(PALETTE_SIZE),
+                height: Val::Px(PALETTE_SIZE),
+                border: UiRect::all(Val::Px(2.0)),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 ..default()
             },
-            color: Color::rgba(0.0, 0.0, 0.0, 0.5).into(),
+            background_color: Color::rgba(0.0, 0.0, 0.0, 0.5).into(),
             ..default()
         })
         .with_children(|parent| {
             parent
-                .spawn_bundle(ImageBundle {
+                .spawn(ImageBundle {
                     style: Style {
-                        size: Size::new(Val::Px(PALETTE_ICON_SIZE), Val::Px(PALETTE_ICON_SIZE)),
+                        width: Val::Px(PALETTE_ICON_SIZE),
+                        height: Val::Px(PALETTE_ICON_SIZE),
                         ..default()
                     },
-                    image: UiImage::from(asset_server.load(file)).into(),
+                    image: UiImage::from(asset).into(),
                     ..default()
                 })
                 .insert(Interaction::default())
@@ -140,30 +151,22 @@ fn add_tower_icon(
 fn palette_mouse_system(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
-    windows: Res<Windows>,
+    // windows: Res<Windows>,
+    window: Query<&Window, With<PrimaryWindow>>,
     level: Res<Level>,
     mut scoreboard: ResMut<Scoreboard>,
     mut query_mouse: Query<(&mut Transform, &mut Visibility), With<MouseCursor>>,
     query_towers: Query<&Tower>,
     query_palette: Query<(&Interaction, &Parent, &TowerPalette), Changed<Interaction>>,
-    mut query_ui_color: Query<&mut UiColor>,
+    mut query_ui_color: Query<&mut BackgroundColor>,
     mut selected_tower: ResMut<SelectedTower>,
+    textures: Res<Textures>,
 ) {
-    if selected_tower
-        .as_ref()
-        .as_ref()
-        .map(|f| f.dragging)
-        .unwrap_or(false)
-        || !level._is_running()
-    {
+    if selected_tower.is_dragging() || !level._is_running() {
         return;
     }
 
-    let window = if let Some(window) = windows.iter().next() {
-        window
-    } else {
-        return;
-    };
+    let window = window.single();
     let mouse = window.cursor_position();
 
     if let Some(((mut cursor_transform, mut visibility), mouse_position)) =
@@ -179,10 +182,11 @@ fn palette_mouse_system(
 
         // println!("Mouse: {:?} -> {:?}", mouse_position, mouse_screen);
         for (interaction, parent, palette) in query_palette.iter() {
-            if let Ok(mut ui_color) = query_ui_color.get_component_mut::<UiColor>(**parent) {
+            if let Ok(mut ui_color) = query_ui_color.get_component_mut::<BackgroundColor>(**parent)
+            {
                 // println!("Has ui_color: {ui_color:?}");
                 match *interaction {
-                    Interaction::Clicked => {
+                    Interaction::Pressed => {
                         println!("Clicked tower palette at {mouse_screen:?}");
 
                         let cost = palette.cost(tower_count);
@@ -192,13 +196,14 @@ fn palette_mouse_system(
 
                         *ui_color = Color::rgba(1., 0., 1., 0.75).into();
 
-                        visibility.is_visible = true;
+                        *visibility = Visibility::Inherited;
                         *cursor_transform =
                             Transform::from_xyz(mouse_screen.x, mouse_screen.y, 0.2)
                                 .with_scale(Vec3::new(2., 2., 1.));
 
-                        let tower = palette.spawn(&mut commands, &asset_server, mouse_screen);
-                        *selected_tower = Some(SelectedTowerProps {
+                        let tower =
+                            palette.spawn(&mut commands, &asset_server, mouse_screen, &textures);
+                        selected_tower.0 = Some(SelectedTowerProps {
                             tower,
                             dragging: true,
                             hovering_trashcan: false,
@@ -222,7 +227,7 @@ fn palette_mouse_system(
 
 fn update_palette_system(
     query_towers: Query<&Tower>,
-    mut query: Query<(&mut UiColor, &TowerPalette)>,
+    mut query: Query<(&mut BackgroundColor, &TowerPalette)>,
     scoreboard: Res<Scoreboard>,
 ) {
     let tower_count = query_towers.iter().count();
@@ -243,21 +248,18 @@ struct PaletteTooltipTowerType;
 
 fn add_palette_tooltip_panel(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
                 // justify_content: JustifyContent::Center,
                 align_items: AlignItems::FlexStart,
                 flex_direction: FlexDirection::Column,
                 position_type: PositionType::Absolute,
-                position: Rect {
-                    top: Val::Px(PADDING * 4. + BUTTON_HEIGHT + STATUS_FONT_SIZE * 6.),
-                    right: Val::Px(PADDING * 2. + PALETTE_SIZE),
-                    ..default()
-                },
+                top: Val::Px(PADDING * 4. + BUTTON_HEIGHT + STATUS_FONT_SIZE * 6.),
+                right: Val::Px(PADDING * 2. + PALETTE_SIZE),
                 ..default()
             },
-            visibility: Visibility { is_visible: false },
-            color: Color::rgba(0., 0., 0., 0.8).into(),
+            visibility: Visibility::Hidden,
+            background_color: Color::rgba(0., 0., 0., 0.8).into(),
             ..default()
         })
         .insert(PaletteTooltipText)
@@ -292,7 +294,7 @@ fn palette_tooltip_system(
         match *interaction {
             Interaction::Hovered => {
                 for mut visibility in query_tooltip_visible.iter_mut() {
-                    visibility.is_visible = true;
+                    *visibility = Visibility::Inherited;
                 }
                 if let Ok(mut text) = query_tooltip_tower_type.get_single_mut() {
                     text.sections[0].value = format!("{:?}", palette);
@@ -303,7 +305,7 @@ fn palette_tooltip_system(
             }
             Interaction::None => {
                 for mut visibility in query_tooltip_visible.iter_mut() {
-                    visibility.is_visible = false;
+                    *visibility = Visibility::Inherited;
                 }
             }
             _ => (),
@@ -316,22 +318,20 @@ struct TrashcanTooltipText;
 
 fn add_trashcan_hint_panel(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
-                size: Size::new(Val::Px(PALETTE_SIZE), Val::Auto),
-                margin: Rect::all(Val::Auto),
+                width: Val::Px(PALETTE_SIZE),
+                height: Val::Auto,
+                margin: UiRect::all(Val::Auto),
                 justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::FlexStart,
                 flex_direction: FlexDirection::ColumnReverse,
                 position_type: PositionType::Absolute,
-                position: Rect {
-                    bottom: Val::Px(PADDING),
-                    right: PADDING_PX,
-                    ..default()
-                },
+                bottom: Val::Px(PADDING),
+                right: PADDING_PX,
                 ..default()
             },
-            color: Color::NONE.into(),
+            background_color: Color::NONE.into(),
             ..default()
         })
         .with_children(|parent| {
@@ -339,21 +339,18 @@ fn add_trashcan_hint_panel(mut commands: Commands, asset_server: Res<AssetServer
         });
 
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
                 // justify_content: JustifyContent::Center,
                 align_items: AlignItems::FlexStart,
                 flex_direction: FlexDirection::Column,
                 position_type: PositionType::Absolute,
-                position: Rect {
-                    bottom: Val::Px(PADDING + PALETTE_SIZE - STATUS_FONT_SIZE),
-                    right: Val::Px(PADDING * 2. + PALETTE_SIZE),
-                    ..default()
-                },
+                bottom: Val::Px(PADDING + PALETTE_SIZE - STATUS_FONT_SIZE),
+                right: Val::Px(PADDING * 2. + PALETTE_SIZE),
                 ..default()
             },
-            visibility: Visibility { is_visible: false },
-            color: Color::rgba(0., 0., 0., 0.8).into(),
+            visibility: Visibility::Hidden,
+            background_color: Color::rgba(0., 0., 0., 0.8).into(),
             ..default()
         })
         .insert(TrashcanTooltipText)
@@ -372,30 +369,30 @@ fn add_trashcan_hint_panel(mut commands: Commands, asset_server: Res<AssetServer
 fn trashcan_tooltip_system(
     query_trashcan: Query<(&Interaction, &Parent), (With<TowerTrashcan>, Changed<Interaction>)>,
     mut query_tooltip_visible: Query<&mut Visibility, With<TrashcanTooltipText>>,
-    mut query_ui_color: Query<&mut UiColor>,
+    mut query_ui_color: Query<&mut BackgroundColor>,
     mut selected_tower: ResMut<SelectedTower>,
 ) {
     for (interaction, parent) in query_trashcan.iter() {
         match *interaction {
             Interaction::Hovered => {
                 for mut visibility in query_tooltip_visible.iter_mut() {
-                    visibility.is_visible = true;
+                    *visibility = Visibility::Inherited;
                 }
                 if let Ok(mut ui_color) = query_ui_color.get_mut(**parent) {
                     *ui_color = Color::rgba(0.5, 0., 0., 0.5).into();
                 }
-                if let Some(selected_tower) = selected_tower.as_mut() {
+                if let Some(selected_tower) = selected_tower.0.as_mut() {
                     selected_tower.hovering_trashcan = true;
                 }
             }
             Interaction::None => {
                 for mut visibility in query_tooltip_visible.iter_mut() {
-                    visibility.is_visible = false;
+                    *visibility = Visibility::Hidden;
                 }
                 if let Ok(mut ui_color) = query_ui_color.get_mut(**parent) {
                     *ui_color = Color::rgba(0.0, 0., 0., 0.5).into();
                 }
-                if let Some(selected_tower) = selected_tower.as_mut() {
+                if let Some(selected_tower) = selected_tower.0.as_mut() {
                     selected_tower.hovering_trashcan = false;
                 }
             }

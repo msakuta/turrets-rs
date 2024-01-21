@@ -4,20 +4,22 @@ use crate::{
     tower::{apprach_angle, MissileShooter, Tower},
     BulletFilter, Health, Level, Position, Rotation, StageClear, Target, Velocity,
 };
-use bevy::{ecs::system::EntityCommands, prelude::*};
+use bevy::{ecs::system::EntityCommands, prelude::*, window::PrimaryWindow};
 
 pub(crate) struct EnemyPlugin;
 
 impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system_set(
-            SystemSet::new()
-                .with_run_criteria(can_update)
-                .with_system(spawn_enemies)
-                .with_system(enemy_system)
-                .with_system(agile_enemy_system)
-                .with_system(sturdy_enemy_system)
-                .with_system(missile_enemy_system),
+        app.add_systems(
+            Update,
+            (
+                spawn_enemies,
+                enemy_system,
+                agile_enemy_system,
+                sturdy_enemy_system,
+                missile_enemy_system,
+            )
+                .run_if(can_update),
         );
     }
 }
@@ -164,7 +166,7 @@ fn spawn_enemies(
     mut commands: Commands,
     query: Query<&Enemy>,
     asset_server: Res<AssetServer>,
-    windows: Res<Windows>,
+    window: Query<&Window, With<PrimaryWindow>>,
     time: Res<Time>,
     level: Res<Level>,
 ) {
@@ -178,11 +180,7 @@ fn spawn_enemies(
         return;
     };
 
-    let window = if let Some(window) = windows.iter().next() {
-        window
-    } else {
-        return;
-    };
+    let window = window.single();
     let (width, height) = (window.width(), window.height());
 
     for enemy_spec in ENEMY_SPECS.iter().take(*difficulty + 1) {
@@ -215,14 +213,14 @@ fn spawn_enemies(
             sprite_transform_single(&position, None, &mut transform, 0.05);
 
             let sprite = commands
-                .spawn_bundle(SpriteBundle {
+                .spawn(SpriteBundle {
                     texture: asset_server.load(enemy_spec.image),
                     transform: Transform::from_scale(Vec3::splat(enemy_spec.sprite_scale)),
                     ..default()
                 })
                 .id();
 
-            let mut builder = commands.spawn_bundle(TransformBundle {
+            let mut builder = commands.spawn(TransformBundle {
                 local: transform,
                 ..default()
             });

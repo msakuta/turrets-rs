@@ -13,7 +13,7 @@ use crate::{
     tower::{spawn_towers, update_health_bar, Tower, TowerPlugin},
     ui::UIPlugin,
 };
-use bevy::{ecs::schedule::ShouldRun, prelude::*};
+use bevy::prelude::*;
 use mouse::SelectedTower;
 use serde::{Deserialize, Serialize};
 use tower::TempEnt;
@@ -26,25 +26,24 @@ fn main() {
         .add_event::<ClearEvent>()
         .add_event::<SaveGameEvent>()
         .insert_resource(ClearColor(Color::rgb(0.1, 0.1, 0.2)))
-        .add_plugins(DefaultPlugins)
-        .add_plugin(UIPlugin)
-        .add_plugin(TowerPlugin)
-        .add_plugin(BulletPlugin)
-        .add_plugin(MousePlugin)
-        .add_plugin(EnemyPlugin)
-        .add_startup_system(setup)
-        .add_system_set(
-            SystemSet::new()
-                .with_run_criteria(can_update)
-                .with_system(time_level)
-                .with_system(timeout_level)
-                .with_system(linear_motion)
-                .with_system(animate_sprite),
+        .add_plugins((
+            DefaultPlugins,
+            UIPlugin,
+            TowerPlugin,
+            BulletPlugin,
+            MousePlugin,
+            EnemyPlugin,
+        ))
+        .add_systems(Startup, setup)
+        .add_systems(
+            Update,
+            (time_level, timeout_level, linear_motion, animate_sprite)
+                .run_if(can_update),
         )
-        .add_system(reset_game)
-        .add_system(sprite_transform)
-        .add_system(update_health_bar)
-        .add_system(save_game)
+        .add_systems(
+            Update,
+            (reset_game, sprite_transform, update_health_bar, save_game),
+        )
         .run();
 }
 
@@ -86,14 +85,16 @@ impl Health {
 #[derive(Component, Deref, DerefMut)]
 struct Explosion(Timer);
 
-// #[derive(Component)]
+#[derive(Resource)]
 struct Textures {
     small_explosion: Handle<TextureAtlas>,
     large_explosion: Handle<TextureAtlas>,
     small_explosion_blue: Handle<TextureAtlas>,
+    tower_circle_material: Handle<ColorMaterial>,
+    trail_material: Handle<ColorMaterial>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Resource)]
 struct Scoreboard {
     score: f64,
     credits: f64,
@@ -128,6 +129,7 @@ struct StageScore {
     high_score: Option<f64>,
 }
 
+#[derive(Resource)]
 enum Level {
     Select,
     Running { difficulty: usize, timer: Timer },
@@ -137,7 +139,7 @@ impl Level {
     fn start(difficulty: usize) -> Self {
         Self::Running {
             difficulty,
-            timer: Timer::from_seconds(60., true),
+            timer: Timer::from_seconds(60., TimerMode::Once),
         }
     }
 
@@ -172,26 +174,39 @@ fn setup(
 ) {
     let mut gen_texture_handle = |file, size, columns| {
         let texture_handle = asset_server.load(file);
-        let texture_atlas =
-            TextureAtlas::from_grid(texture_handle, Vec2::new(size, size), columns, 1);
+        let texture_atlas = TextureAtlas::from_grid(
+            texture_handle,
+            Vec2::new(size, size),
+            columns,
+            1,
+            None,
+            None,
+        );
         texture_atlases.add(texture_atlas)
     };
-    commands.insert_resource(Textures {
+    let textures = Textures {
         small_explosion: gen_texture_handle("explode.png", 16., 8),
         large_explosion: gen_texture_handle("explode2.png", 32., 6),
         small_explosion_blue: gen_texture_handle("explode-blue.png", 16., 8),
-    });
+        tower_circle_material: asset_server.add(ColorMaterial {
+            color: Color::rgba(0.0, 0.8, 0.8, 1.),
+            ..default()
+        }),
+        trail_material: asset_server.add(ColorMaterial {
+            color: Color::rgba(0.8, 0.8, 0.7, 0.5),
+            ..default()
+        }),
+    };
 
     let mut scoreboard = Scoreboard::default();
-    load_game(&mut commands, &asset_server, &mut scoreboard);
+    load_game(&mut commands, &asset_server, &mut scoreboard, &textures);
 
+    commands.insert_resource(textures);
     commands.insert_resource(scoreboard);
     commands.insert_resource(Level::Select);
-    commands.spawn_bundle(OrthographicCameraBundle::new_2d());
+    commands.spawn(Camera2dBundle::default());
 
-    commands.spawn_bundle(UiCameraBundle::default());
-
-    commands.spawn_bundle(SpriteBundle {
+    commands.spawn(SpriteBundle {
         texture: asset_server.load("cliff-crop.png"),
         transform: Transform::from_scale(Vec3::ONE * 2.),
         ..default()
@@ -206,6 +221,7 @@ fn time_level(mut level: ResMut<Level>, time: Res<Time>) {
     }
 }
 
+#[derive(Event)]
 struct ClearEvent;
 
 fn timeout_level(level: ResMut<Level>, mut writer: EventWriter<ClearEvent>) {
@@ -223,8 +239,9 @@ fn reset_game(
     mut writer: EventWriter<SaveGameEvent>,
     mut scoreboard: ResMut<Scoreboard>,
     asset_server: Res<AssetServer>,
+    textures: Res<Textures>,
 ) {
-    if reader.iter().next().is_some() {
+    if reader.read().next().is_some() {
         println!("Round finished!");
         for entity in query.iter() {
             commands.entity(entity).despawn_recursive();
@@ -238,7 +255,7 @@ fn reset_game(
         }
 
         if !any_tower {
-            spawn_towers(&mut commands, &asset_server);
+            spawn_towers(&mut commands, &asset_server, textures.as_ref());
             scoreboard.score = 0.;
         } else if let Level::Running { difficulty, .. } = level.as_ref() {
             let score = scoreboard.score;
@@ -321,12 +338,6 @@ fn animate_sprite(
     }
 }
 
-fn can_update(selected_tower: Res<SelectedTower>, pause_state: Res<PauseState>) -> ShouldRun {
-    if tower_not_dragging(selected_tower) == ShouldRun::Yes
-        && not_paused(pause_state) == ShouldRun::Yes
-    {
-        ShouldRun::Yes
-    } else {
-        ShouldRun::No
-    }
+fn can_update(selected_tower: Res<SelectedTower>, pause_state: Res<PauseState>) -> bool {
+    tower_not_dragging(selected_tower) && not_paused(pause_state)
 }

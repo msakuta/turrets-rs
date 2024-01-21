@@ -1,6 +1,6 @@
 use super::{
-    apprach_angle, shape_from_size, tower_sprite_bundle, tower_transform_bundle, Tower,
-    TowerBundle, TowerInitBundle, TowerLevel, BEAM_TOWER_HEALTH,
+    apprach_angle, tower_circle, tower_sprite_bundle, tower_transform_bundle, Tower, TowerBundle,
+    TowerInitBundle, TowerLevel, BEAM_TOWER_HEALTH,
 };
 use crate::{
     bullet::GainExpEvent, enemy::Enemy, BulletFilter, Explosion, Health, Position, Rotation,
@@ -45,6 +45,7 @@ pub(crate) fn spawn_beam_tower(
     position: Vec2,
     rotation: f64,
     bundle: TowerInitBundle,
+    textures: &Textures,
 ) -> Entity {
     let tower = TowerBundle::new(
         commands,
@@ -57,22 +58,22 @@ pub(crate) fn spawn_beam_tower(
         },
     );
     let sprite = commands
-        .spawn_bundle(tower_sprite_bundle("beam-tower.png", asset_server, 3.))
+        .spawn(tower_sprite_bundle("beam-tower.png", asset_server, 3.))
         .id();
     let beam = commands
-        .spawn_bundle(SpriteBundle {
+        .spawn(SpriteBundle {
             texture: asset_server.load("beam.png"),
             transform: Transform::from_translation(Vec3::new(BEAM_RANGE / 2., 0., 0.025))
                 .with_scale(Vec3::new(BEAM_RANGE / BEAM_SPRITE_SIZE, 1., 1.)),
-            visibility: Visibility { is_visible: false },
+            visibility: Visibility::Hidden,
             ..default()
         })
         .id();
-    let shape = commands.spawn_bundle(shape_from_size(BEAM_TOWER_SIZE)).id();
+    let shape = commands.spawn(tower_circle(BEAM_TOWER_SIZE, textures)).id();
     commands
-        .spawn_bundle(tower)
+        .spawn(tower)
         .insert(BeamTower::new(beam))
-        .insert_bundle(tower_transform_bundle(position))
+        .insert(tower_transform_bundle(position))
         .add_child(sprite)
         .add_child(shape)
         .add_child(beam)
@@ -150,13 +151,13 @@ pub(crate) fn shoot_beam(
         } else {
             beamer.shoot_phase = 0.;
             if let Some(mut beam) = beamer.beam.and_then(|beam| beam_query.get_mut(beam).ok()) {
-                beam.is_visible = false;
+                *beam = Visibility::Hidden;
             }
             continue;
         }
 
         if let Some(mut beam) = beamer.beam.and_then(|beam| beam_query.get_mut(beam).ok()) {
-            beam.is_visible = true;
+            *beam = Visibility::Inherited;
         }
 
         for (target_position, mut target, bullet_filter) in target_query.iter_mut() {
@@ -189,7 +190,7 @@ pub(crate) fn shoot_beam(
             }
 
             commands
-                .spawn_bundle(SpriteSheetBundle {
+                .spawn(SpriteSheetBundle {
                     texture_atlas: textures.small_explosion_blue.clone(),
                     transform: Transform::from_translation(Vec3::new(
                         target_position.0.x,
@@ -199,7 +200,7 @@ pub(crate) fn shoot_beam(
                     .with_scale(Vec3::splat(3.0)),
                     ..default()
                 })
-                .insert(Explosion(Timer::from_seconds(0.06, true)))
+                .insert(Explosion(Timer::from_seconds(0.06, TimerMode::Repeating)))
                 .insert(StageClear);
         }
     }

@@ -1,9 +1,10 @@
 use super::{
-    heal_amt_by_level, shape_from_size, tower_sprite_bundle, tower_transform_bundle, TempEnt,
-    Timeout, Tower, TowerBundle, TowerInitBundle, HEALER_HEALTH, TOWER_SIZE,
+    heal_amt_by_level, tower_circle, tower_sprite_bundle, tower_transform_bundle, TempEnt, Timeout,
+    Tower, TowerBundle, TowerInitBundle, HEALER_HEALTH, TOWER_SIZE,
 };
 use crate::{
-    bullet::GainExpEvent, tower::apprach_angle, Health, Position, Rotation, Target, Velocity,
+    bullet::GainExpEvent, tower::apprach_angle, Health, Position, Rotation, Target, Textures,
+    Velocity,
 };
 use bevy::prelude::*;
 
@@ -33,6 +34,7 @@ pub(crate) fn spawn_healer(
     position: Vec2,
     rotation: f64,
     bundle: TowerInitBundle,
+    textures: &Textures,
 ) -> Entity {
     let healer = Healer::new_with_heal_amt(heal_amt_by_level(
         bundle.tower_level.as_ref().map(|l| l.level).unwrap_or(0),
@@ -48,12 +50,12 @@ pub(crate) fn spawn_healer(
         },
     );
     let sprite = commands
-        .spawn_bundle(tower_sprite_bundle("healer.png", asset_server, 3.))
+        .spawn(tower_sprite_bundle("healer.png", asset_server, 3.))
         .id();
-    let shape = commands.spawn_bundle(shape_from_size(TOWER_SIZE)).id();
+    let shape = commands.spawn(tower_circle(TOWER_SIZE, textures)).id();
     commands
-        .spawn_bundle(tower)
-        .insert_bundle(tower_transform_bundle(position))
+        .spawn(tower)
+        .insert(tower_transform_bundle(position))
         .insert(healer)
         .add_child(sprite)
         .add_child(shape)
@@ -132,7 +134,7 @@ pub(crate) fn heal_target(
                         killed: false,
                     });
                     commands
-                        .spawn_bundle(SpriteBundle {
+                        .spawn(SpriteBundle {
                             texture: asset_server.load("heal-effect.png"),
                             sprite: Sprite {
                                 custom_size: Some(Vec2::new(20.0, 20.0)),
@@ -149,7 +151,7 @@ pub(crate) fn heal_target(
                     let centroid = (position.0 + target_position.0) / 2.;
 
                     commands
-                        .spawn_bundle(SpriteBundle {
+                        .spawn(SpriteBundle {
                             sprite: Sprite {
                                 color: Color::rgb(0.25, 1., 0.25),
                                 custom_size: Some(Vec2::new(delta.length(), 2.0)),
