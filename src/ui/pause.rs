@@ -1,29 +1,32 @@
-use bevy::prelude::*;
+use bevy::{ecs::schedule::ShouldRun, prelude::*};
 
-use crate::{ClearEvent, Level, StageClear};
+use crate::Level;
 
-use super::{QuitEvent, BUTTON_HEIGHT, PADDING_PX, SCOREBOARD_FONT_SIZE, TEXT_COLOR};
-
-pub(super) const BUTTON_WIDTH: f32 = 150.;
+use super::{
+    PauseEvent, PauseState, BUTTON_HEIGHT, PADDING_PX, PADDING_PX2, SCOREBOARD_FONT_SIZE,
+    TEXT_COLOR,
+};
 
 const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
-pub(super) const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
+const ACTIVE_BUTTON: Color = Color::rgb(0.40, 0.40, 0.15);
+const HOVERED_BUTTON: Color = Color::rgb(0.25, 0.25, 0.25);
+const HOVERED_ACTIVE_BUTTON: Color = Color::rgb(0.50, 0.50, 0.25);
 
 #[derive(Component)]
-pub(super) struct QuitButtonFilter;
+pub(super) struct PauseButtonFilter;
 
-pub(super) fn add_quit_button(commands: &mut Commands, asset_server: &Res<AssetServer>) {
+pub(super) fn add_pause_button(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     commands
         .spawn_bundle(ButtonBundle {
             style: Style {
-                size: Size::new(Val::Px(BUTTON_WIDTH), Val::Px(BUTTON_HEIGHT)),
+                size: Size::new(Val::Px(100.0), Val::Px(BUTTON_HEIGHT)),
                 margin: Rect::all(Val::Auto),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 position_type: PositionType::Absolute,
                 position: Rect {
                     top: PADDING_PX,
-                    right: PADDING_PX,
+                    right: PADDING_PX2 + super::quit::BUTTON_WIDTH,
                     ..default()
                 },
                 ..default()
@@ -31,12 +34,12 @@ pub(super) fn add_quit_button(commands: &mut Commands, asset_server: &Res<AssetS
             color: NORMAL_BUTTON.into(),
             ..default()
         })
-        .insert(QuitButtonFilter)
+        .insert(PauseButtonFilter)
         .with_children(|parent| {
             parent
                 .spawn_bundle(TextBundle {
                     text: Text::with_section(
-                        "Quit",
+                        "Pause",
                         TextStyle {
                             font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                             font_size: SCOREBOARD_FONT_SIZE,
@@ -46,17 +49,18 @@ pub(super) fn add_quit_button(commands: &mut Commands, asset_server: &Res<AssetS
                     ),
                     ..default()
                 })
-                .insert(QuitButtonFilter);
+                .insert(PauseButtonFilter);
         });
 }
 
-pub(super) fn quit_button_system(
+pub(super) fn pause_button_system(
     mut interaction_query: Query<
         (&Interaction, &mut UiColor),
-        (Changed<Interaction>, With<Button>, With<QuitButtonFilter>),
+        (Changed<Interaction>, With<Button>, With<PauseButtonFilter>),
     >,
-    mut writer: EventWriter<QuitEvent>,
+    mut writer: EventWriter<PauseEvent>,
     level: Res<Level>,
+    pause_state: Res<PauseState>,
 ) {
     if let Level::Select = level.as_ref() {
         return;
@@ -64,37 +68,46 @@ pub(super) fn quit_button_system(
     for (interaction, mut color) in interaction_query.iter_mut() {
         match *interaction {
             Interaction::Clicked => {
-                writer.send(QuitEvent);
+                writer.send(PauseEvent);
             }
             Interaction::Hovered => {
-                *color = HOVERED_BUTTON.into();
+                *color = if pause_state.0 {
+                    HOVERED_ACTIVE_BUTTON.into()
+                } else {
+                    HOVERED_BUTTON.into()
+                };
             }
             Interaction::None => {
-                *color = NORMAL_BUTTON.into();
+                *color = if pause_state.0 {
+                    ACTIVE_BUTTON.into()
+                } else {
+                    NORMAL_BUTTON.into()
+                }
             }
         }
     }
 }
 
-pub(super) fn quit_event_system(
-    mut commands: Commands,
-    query: Query<Entity, With<StageClear>>,
-    mut level: ResMut<Level>,
-    mut reader: EventReader<QuitEvent>,
-    mut writer: EventWriter<ClearEvent>,
+pub(super) fn pause_event_system(
+    mut reader: EventReader<PauseEvent>,
+    mut pause_state: ResMut<PauseState>,
 ) {
     if reader.iter().last().is_some() {
-        println!("Received QuitEvent");
-        for entity in query.iter() {
-            commands.entity(entity).despawn_recursive();
-        }
-        *level = Level::Select;
-        writer.send(ClearEvent);
+        println!("Received PauseEvent: {}", pause_state.0);
+        pause_state.0 = !pause_state.0;
     }
 }
 
-pub(super) fn show_quit_button_system(
-    mut button_query: Query<&mut Visibility, With<QuitButtonFilter>>,
+pub(crate) fn not_paused(pause_state: Res<PauseState>) -> ShouldRun {
+    if pause_state.0 {
+        ShouldRun::No
+    } else {
+        ShouldRun::Yes
+    }
+}
+
+pub(super) fn show_pause_button_system(
+    mut button_query: Query<&mut Visibility, With<PauseButtonFilter>>,
     level: Res<Level>,
 ) {
     for mut button in button_query.iter_mut() {

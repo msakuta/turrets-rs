@@ -7,8 +7,7 @@ use self::{
 };
 use crate::{
     bullet::{BulletShooter, GainExpEvent},
-    mouse::tower_not_dragging,
-    BulletFilter, Enemy, Health, Position, Rotation, Target,
+    can_update, BulletFilter, Enemy, Health, Position, Rotation, Target,
 };
 use ::serde::{Deserialize, Serialize};
 use bevy::prelude::*;
@@ -121,7 +120,7 @@ impl Plugin for TowerPlugin {
     fn build(&self, app: &mut App) {
         app.add_system(update_health_bar).add_system_set(
             SystemSet::new()
-                .with_run_criteria(tower_not_dragging)
+                .with_run_criteria(can_update)
                 .with_system(tower_find_target)
                 .with_system(healer_find_target)
                 .with_system(heal_target)

@@ -10,12 +10,14 @@ use crate::{
     enemy::{Enemy, EnemyPlugin},
     mouse::{tower_not_dragging, MousePlugin},
     save::{load_game, save_game, SaveGameEvent},
-    tower::{spawn_towers, update_health_bar, Timeout, Tower, TowerPlugin},
+    tower::{spawn_towers, update_health_bar, Tower, TowerPlugin},
     ui::UIPlugin,
 };
-use bevy::prelude::*;
+use bevy::{ecs::schedule::ShouldRun, prelude::*};
+use mouse::SelectedTower;
 use serde::{Deserialize, Serialize};
 use tower::TempEnt;
+use ui::{not_paused, PauseState};
 
 const MAX_DIFFICULTY: usize = 5;
 
@@ -33,7 +35,7 @@ fn main() {
         .add_startup_system(setup)
         .add_system_set(
             SystemSet::new()
-                .with_run_criteria(tower_not_dragging)
+                .with_run_criteria(can_update)
                 .with_system(time_level)
                 .with_system(timeout_level)
                 .with_system(linear_motion)
@@ -316,5 +318,15 @@ fn animate_sprite(
                 sprite.index = (sprite.index + 1) % texture_atlas.textures.len();
             }
         }
+    }
+}
+
+fn can_update(selected_tower: Res<SelectedTower>, pause_state: Res<PauseState>) -> ShouldRun {
+    if tower_not_dragging(selected_tower) == ShouldRun::Yes
+        && not_paused(pause_state) == ShouldRun::Yes
+    {
+        ShouldRun::Yes
+    } else {
+        ShouldRun::No
     }
 }

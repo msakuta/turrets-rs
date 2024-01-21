@@ -1,7 +1,6 @@
 use crate::{
     bullet::{BulletShooter, ENEMY_SIZE},
-    mouse::tower_not_dragging,
-    sprite_transform_single,
+    can_update, sprite_transform_single,
     tower::{apprach_angle, MissileShooter, Tower},
     BulletFilter, Health, Level, Position, Rotation, StageClear, Target, Velocity,
 };
@@ -13,7 +12,7 @@ impl Plugin for EnemyPlugin {
     fn build(&self, app: &mut App) {
         app.add_system_set(
             SystemSet::new()
-                .with_run_criteria(tower_not_dragging)
+                .with_run_criteria(can_update)
                 .with_system(spawn_enemies)
                 .with_system(enemy_system)
                 .with_system(agile_enemy_system)

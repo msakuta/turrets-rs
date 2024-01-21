@@ -2,8 +2,7 @@ mod missile;
 
 use self::missile::{missile_system, Missile, MISSILE_SPEED};
 use crate::{
-    mouse::tower_not_dragging,
-    sprite_transform_single,
+    can_update, sprite_transform_single,
     tower::{MissileShooter, Shotgun, TempEnt, Tower},
     BulletFilter, Explosion, Health, Position, Rotation, Scoreboard, StageClear, Target, Textures,
     Velocity,
@@ -35,7 +34,7 @@ impl Plugin for BulletPlugin {
         app.add_event::<GainExpEvent>();
         app.add_system_set(
             SystemSet::new()
-                .with_run_criteria(tower_not_dragging)
+                .with_run_criteria(can_update)
                 .with_system(shoot_bullet)
                 .with_system(bullet_collision_system)
                 .with_system(missile_system),

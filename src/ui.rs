@@ -1,4 +1,5 @@
 mod difficulty_select;
+mod pause;
 mod quit;
 mod scoreboard;
 mod tower_palette;
@@ -8,12 +9,14 @@ use bevy::{ecs::system::EntityCommands, prelude::*};
 
 use self::{
     difficulty_select::{add_difficulty_buttons, DifficultySelectPlugin},
+    pause::{add_pause_button, pause_button_system, pause_event_system, show_pause_button_system},
     quit::{add_quit_button, quit_button_system, quit_event_system, show_quit_button_system},
     scoreboard::{add_scoreboard, update_credits, update_level, update_scoreboard},
     tower_palette::{add_palette_buttons, build_tower_palette},
     tower_status::build_tower_status,
 };
 use crate::Level;
+pub(crate) use pause::not_paused;
 
 pub(crate) struct UIPlugin;
 
@@ -22,6 +25,7 @@ impl Plugin for UIPlugin {
         app.add_plugin(DifficultySelectPlugin);
         app.add_event::<StartEvent>();
         app.add_event::<QuitEvent>();
+        app.add_event::<PauseEvent>();
         app.add_startup_system(build_ui);
         app.add_system(update_progress_bar);
         app.add_system(update_level);
@@ -32,11 +36,18 @@ impl Plugin for UIPlugin {
         app.add_system(quit_event_system);
         app.add_system(quit_button_system);
         app.add_system(show_quit_button_system);
+        app.insert_resource(PauseState(false));
+        app.add_system(pause_event_system);
+        app.add_system(pause_button_system);
+        app.add_system(show_pause_button_system);
     }
 }
 
 struct StartEvent(usize);
 struct QuitEvent;
+struct PauseEvent;
+
+pub(crate) struct PauseState(bool);
 
 #[derive(Component)]
 struct ProgressBar;
@@ -44,6 +55,7 @@ struct ProgressBar;
 const SCOREBOARD_FONT_SIZE: f32 = 40.0;
 const PADDING: f32 = 5.;
 const PADDING_PX: Val = Val::Px(PADDING);
+const PADDING_PX2: Val = Val::Px(PADDING * 2.);
 const TEXT_COLOR: Color = Color::rgb(0.9, 0.9, 0.9);
 const SCORE_COLOR: Color = Color::rgb(1.0, 0.5, 0.5);
 
@@ -87,6 +99,7 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
         });
 
     add_quit_button(&mut commands, &asset_server);
+    add_pause_button(&mut commands, &asset_server);
     add_palette_buttons(&mut commands, &asset_server);
     add_difficulty_buttons(&mut commands, &asset_server);
 }
