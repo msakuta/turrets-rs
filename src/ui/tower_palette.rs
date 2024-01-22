@@ -80,11 +80,11 @@ pub(super) fn add_palette_buttons(commands: &mut Commands, asset_server: &Res<As
         .spawn(NodeBundle {
             style: Style {
                 width: Val::Px(PALETTE_SIZE),
-                height: Val::Percent(100.0),
+                // height: Val::Percent(100.0),
                 margin: UiRect::all(Val::Auto),
                 justify_content: JustifyContent::FlexStart,
                 align_items: AlignItems::FlexStart,
-                flex_direction: FlexDirection::ColumnReverse,
+                flex_direction: FlexDirection::Column,
                 position_type: PositionType::Absolute,
                 top: Val::Px(PADDING * 2. + BUTTON_HEIGHT),
                 right: PADDING_PX,

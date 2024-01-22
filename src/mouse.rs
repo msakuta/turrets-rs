@@ -71,7 +71,7 @@ fn mouse_system(
         let (width, height) = (window.width(), window.height());
         let mouse_screen = Vec2::new(
             mouse_position.x - width / 2.,
-            mouse_position.y - height / 2.,
+            -(mouse_position.y - height / 2.),
         );
 
         let mut dragging = false;

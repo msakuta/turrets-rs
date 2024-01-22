@@ -37,8 +37,7 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (time_level, timeout_level, linear_motion, animate_sprite)
-                .run_if(can_update),
+            (time_level, timeout_level, linear_motion, animate_sprite).run_if(can_update),
         )
         .add_systems(
             Update,

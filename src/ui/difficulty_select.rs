@@ -49,7 +49,7 @@ pub(super) fn add_difficulty_buttons(commands: &mut Commands, asset_server: &Res
                 margin: UiRect::all(Val::Auto),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                flex_direction: FlexDirection::ColumnReverse,
+                flex_direction: FlexDirection::Column,
                 ..default()
             },
             background_color: Color::rgb(0.5, 0.5, 0.5).into(),
