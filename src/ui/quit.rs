@@ -14,35 +14,32 @@ pub(super) struct QuitButtonFilter;
 
 pub(super) fn add_quit_button(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     commands
-        .spawn_bundle(ButtonBundle {
+        .spawn(ButtonBundle {
             style: Style {
-                size: Size::new(Val::Px(BUTTON_WIDTH), Val::Px(BUTTON_HEIGHT)),
-                margin: Rect::all(Val::Auto),
+                width: Val::Px(BUTTON_WIDTH),
+                height: Val::Px(BUTTON_HEIGHT),
+                margin: UiRect::all(Val::Auto),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 position_type: PositionType::Absolute,
-                position: Rect {
-                    top: PADDING_PX,
-                    right: PADDING_PX,
-                    ..default()
-                },
+                top: PADDING_PX,
+                right: PADDING_PX,
                 ..default()
             },
-            color: NORMAL_BUTTON.into(),
+            background_color: NORMAL_BUTTON.into(),
             ..default()
         })
         .insert(QuitButtonFilter)
         .with_children(|parent| {
             parent
-                .spawn_bundle(TextBundle {
-                    text: Text::with_section(
+                .spawn(TextBundle {
+                    text: Text::from_section(
                         "Quit",
                         TextStyle {
                             font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                             font_size: SCOREBOARD_FONT_SIZE,
                             color: TEXT_COLOR,
                         },
-                        Default::default(),
                     ),
                     ..default()
                 })
@@ -52,7 +49,7 @@ pub(super) fn add_quit_button(commands: &mut Commands, asset_server: &Res<AssetS
 
 pub(super) fn quit_button_system(
     mut interaction_query: Query<
-        (&Interaction, &mut UiColor),
+        (&Interaction, &mut BackgroundColor),
         (Changed<Interaction>, With<Button>, With<QuitButtonFilter>),
     >,
     mut writer: EventWriter<QuitEvent>,
@@ -63,7 +60,7 @@ pub(super) fn quit_button_system(
     }
     for (interaction, mut color) in interaction_query.iter_mut() {
         match *interaction {
-            Interaction::Clicked => {
+            Interaction::Pressed => {
                 writer.send(QuitEvent);
             }
             Interaction::Hovered => {
@@ -83,7 +80,7 @@ pub(super) fn quit_event_system(
     mut reader: EventReader<QuitEvent>,
     mut writer: EventWriter<ClearEvent>,
 ) {
-    if reader.iter().last().is_some() {
+    if reader.read().last().is_some() {
         println!("Received QuitEvent");
         for entity in query.iter() {
             commands.entity(entity).despawn_recursive();
@@ -98,10 +95,10 @@ pub(super) fn show_quit_button_system(
     level: Res<Level>,
 ) {
     for mut button in button_query.iter_mut() {
-        button.is_visible = if let Level::Select = level.as_ref() {
-            false
+        *button = if let Level::Select = level.as_ref() {
+            Visibility::Hidden
         } else {
-            true
+            Visibility::Inherited
         };
     }
 }

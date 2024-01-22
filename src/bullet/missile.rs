@@ -1,5 +1,5 @@
-use crate::{BulletFilter, Health, Position, Rotation, StageClear, Velocity};
-use bevy::{ecs::system::QueryComponentError, prelude::*};
+use crate::{BulletFilter, Health, Position, Rotation, StageClear, Textures, Velocity};
+use bevy::{ecs::query::QueryComponentError, prelude::*};
 use bevy_prototype_lyon::prelude::*;
 use std::collections::VecDeque;
 
@@ -157,18 +157,26 @@ fn guide_to_target(
     Ok(())
 }
 
-pub(super) fn gen_trail(commands: &mut Commands, position: &Position) -> Entity {
+pub(super) fn gen_trail(
+    commands: &mut Commands,
+    position: &Position,
+    textures: &Textures,
+) -> Entity {
     // Build empty path, which we will replace later
     let mut path_builder = PathBuilder::new();
     path_builder.move_to(position.0);
     let line = path_builder.build();
 
     commands
-        .spawn_bundle(GeometryBuilder::build_as(
-            &line,
-            DrawMode::Stroke(StrokeMode::new(Color::rgba(0.8, 0.8, 0.7, 0.5), 3.0)),
-            Transform::from_xyz(0., 0., 0.05),
-        ))
+        .spawn(ShapeBundle {
+            path: GeometryBuilder::build_as(&line),
+            material: textures.trail_material.clone(),
+            spatial: SpatialBundle {
+                transform: Transform::from_xyz(0., 0., 0.05),
+                ..default()
+            },
+            ..default()
+        })
         .insert(StageClear)
         .id()
 }

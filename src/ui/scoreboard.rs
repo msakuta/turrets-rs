@@ -16,26 +16,23 @@ pub(super) struct CreditsText;
 pub(super) fn add_scoreboard(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     // Scoreboard
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
-                margin: Rect::all(Val::Auto),
+                margin: UiRect::all(Val::Auto),
                 position_type: PositionType::Absolute,
-                position: Rect {
-                    top: PADDING_PX,
-                    left: PADDING_PX,
-                    ..default()
-                },
+                top: PADDING_PX,
+                left: PADDING_PX,
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::FlexStart,
                 flex_direction: FlexDirection::ColumnReverse,
                 ..default()
             },
-            color: Color::rgba(0., 0., 0., 0.5).into(),
+            background_color: Color::rgba(0., 0., 0., 0.5).into(),
             ..default()
         })
         .with_children(|parent| {
             parent
-                .spawn_bundle(TextBundle {
+                .spawn(TextBundle {
                     text: Text {
                         sections: vec![
                             TextSection {
@@ -62,7 +59,7 @@ pub(super) fn add_scoreboard(commands: &mut Commands, asset_server: &Res<AssetSe
                 .insert(LevelText);
 
             parent
-                .spawn_bundle(TextBundle {
+                .spawn(TextBundle {
                     text: Text {
                         sections: vec![
                             TextSection {
@@ -89,7 +86,7 @@ pub(super) fn add_scoreboard(commands: &mut Commands, asset_server: &Res<AssetSe
                 .insert(ScoreText);
 
             parent
-                .spawn_bundle(TextBundle {
+                .spawn(TextBundle {
                     text: Text {
                         sections: vec![
                             TextSection {
