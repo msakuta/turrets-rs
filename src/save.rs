@@ -3,7 +3,7 @@ use crate::{
         spawn_beam_tower, spawn_healer, spawn_missile_tower, spawn_shotgun, spawn_turret,
         BeamTower, Healer, MissileShooter, Shotgun, Tower, TowerInitBundle, TowerLevel, TowerScore,
     },
-    Health, Position, Rotation, Scoreboard, MAX_DIFFICULTY,
+    Health, Position, Rotation, Scoreboard, Textures, MAX_DIFFICULTY,
 };
 use bevy::prelude::*;
 use serde_json::{from_str, from_value, json, Value};
@@ -11,6 +11,7 @@ use serde_json::{from_str, from_value, json, Value};
 #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 const WASM_SAVE_KEY: &str = "turret-rs/save";
 
+#[derive(Event)]
 pub(crate) struct SaveGameEvent;
 
 #[derive(Debug)]
@@ -40,7 +41,7 @@ pub(crate) fn save_game(
     >,
     scoreboard: Res<Scoreboard>,
 ) {
-    for _e in reader.iter() {
+    for _e in reader.read() {
         println!("Save event");
 
         match (|| -> Result<(), MyError> {
@@ -105,6 +106,7 @@ pub(crate) fn load_game(
     commands: &mut Commands,
     asset_server: &Res<AssetServer>,
     scoreboard: &mut Scoreboard,
+    textures: &Textures,
 ) {
     #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
     let json_str = if let Ok(json_str) = std::fs::read_to_string("save.json") {
@@ -168,6 +170,7 @@ pub(crate) fn load_game(
                             serde_json::from_value(position)?,
                             serde_json::from_value(rotation)?,
                             bundle,
+                            textures,
                         );
                     }
                     "Shotgun" => {
@@ -177,6 +180,7 @@ pub(crate) fn load_game(
                             serde_json::from_value(position)?,
                             serde_json::from_value(rotation)?,
                             bundle,
+                            textures,
                         );
                     }
                     "Healer" => {
@@ -186,6 +190,7 @@ pub(crate) fn load_game(
                             serde_json::from_value(position)?,
                             serde_json::from_value(rotation)?,
                             bundle,
+                            textures,
                         );
                     }
                     "MissileTower" => {
@@ -195,6 +200,7 @@ pub(crate) fn load_game(
                             serde_json::from_value(position)?,
                             serde_json::from_value(rotation)?,
                             bundle,
+                            textures,
                         );
                     }
                     "BeamTower" => {
@@ -204,6 +210,7 @@ pub(crate) fn load_game(
                             serde_json::from_value(position)?,
                             serde_json::from_value(rotation)?,
                             bundle,
+                            textures,
                         );
                     }
                     _ => println!("Unrecognized type!"),

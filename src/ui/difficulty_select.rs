@@ -2,7 +2,7 @@ use bevy::{prelude::*, ui::FocusPolicy};
 
 use crate::{
     tower::{spawn_towers, Tower},
-    Level, Scoreboard, StageClear, MAX_DIFFICULTY,
+    Level, Scoreboard, StageClear, Textures, MAX_DIFFICULTY,
 };
 
 use super::{quit::HOVERED_BUTTON, StartEvent, TEXT_COLOR};
@@ -14,11 +14,16 @@ pub(super) struct DifficultySelectPlugin;
 
 impl Plugin for DifficultySelectPlugin {
     fn build(&self, app: &mut App) {
-        app.add_system(difficulty_button_system);
-        app.add_system(difficulty_event_system);
-        app.add_system(show_difficulty_buttons_system);
-        app.add_system(cleared_icon_system);
-        app.add_system(high_score_text_system);
+        app.add_systems(
+            Update,
+            (
+                difficulty_button_system,
+                difficulty_event_system,
+                show_difficulty_buttons_system,
+                cleared_icon_system,
+                high_score_text_system,
+            ),
+        );
     }
 }
 
@@ -27,7 +32,7 @@ struct DifficultyButtonFilter;
 
 #[derive(Component)]
 struct DifficultyButton {
-    color: UiColor,
+    color: BackgroundColor,
     difficulty: usize,
 }
 
@@ -39,21 +44,21 @@ struct HighScoreText(usize);
 
 pub(super) fn add_difficulty_buttons(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
-                margin: Rect::all(Val::Auto),
+                margin: UiRect::all(Val::Auto),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
-                flex_direction: FlexDirection::ColumnReverse,
+                flex_direction: FlexDirection::Column,
                 ..default()
             },
-            color: Color::rgb(0.5, 0.5, 0.5).into(),
+            background_color: Color::rgb(0.5, 0.5, 0.5).into(),
             ..default()
         })
         .insert(DifficultyButtonFilter)
         .with_children(|parent| {
             for difficulty in 0..MAX_DIFFICULTY {
-                let color = Color::rgb(
+                let background_color = Color::rgb(
                     0.15 + difficulty as f32 / MAX_DIFFICULTY as f32 * 0.5,
                     0.15,
                     0.15,
@@ -61,22 +66,26 @@ pub(super) fn add_difficulty_buttons(commands: &mut Commands, asset_server: &Res
                 .into();
 
                 parent
-                    .spawn_bundle(ButtonBundle {
+                    .spawn(ButtonBundle {
                         style: Style {
-                            size: Size::new(Val::Px(300.0), Val::Px(65.0)),
-                            margin: Rect::all(Val::Px(3.)),
+                            width: Val::Px(300.0),
+                            height: Val::Px(65.0),
+                            margin: UiRect::all(Val::Px(3.)),
                             justify_content: JustifyContent::Center,
                             align_items: AlignItems::Center,
                             ..default()
                         },
-                        color,
+                        background_color,
                         ..default()
                     })
-                    .insert(DifficultyButton { color, difficulty })
+                    .insert(DifficultyButton {
+                        color: background_color,
+                        difficulty,
+                    })
                     .insert(DifficultyButtonFilter)
                     .with_children(|parent| {
                         parent
-                            .spawn_bundle(ImageBundle {
+                            .spawn(ImageBundle {
                                 image: asset_server.load("checked.png").into(),
                                 focus_policy: FocusPolicy::Pass,
                                 ..default()
@@ -84,7 +93,7 @@ pub(super) fn add_difficulty_buttons(commands: &mut Commands, asset_server: &Res
                             .insert(DifficultyCleared(difficulty));
 
                         parent
-                            .spawn_bundle(NodeBundle {
+                            .spawn(NodeBundle {
                                 style: Style {
                                     justify_content: JustifyContent::Center,
                                     align_items: AlignItems::FlexStart,
@@ -92,35 +101,33 @@ pub(super) fn add_difficulty_buttons(commands: &mut Commands, asset_server: &Res
                                     ..default()
                                 },
                                 focus_policy: FocusPolicy::Pass,
-                                color: Color::NONE.into(),
+                                background_color: Color::NONE.into(),
                                 ..default()
                             })
                             .with_children(|parent| {
                                 parent
-                                    .spawn_bundle(TextBundle {
-                                        text: Text::with_section(
+                                    .spawn(TextBundle {
+                                        text: Text::from_section(
                                             &format!("Start Level {}", difficulty),
                                             TextStyle {
                                                 font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                                                 font_size: DIFFICULTY_FONT_SIZE,
                                                 color: TEXT_COLOR,
                                             },
-                                            Default::default(),
                                         ),
                                         ..default()
                                     })
                                     .insert(DifficultyButtonFilter);
 
                                 parent
-                                    .spawn_bundle(TextBundle {
-                                        text: Text::with_section(
+                                    .spawn(TextBundle {
+                                        text: Text::from_section(
                                             &format!("High score: ?"),
                                             TextStyle {
                                                 font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                                                 font_size: HIGHSCORE_FONT_SIZE,
                                                 color: TEXT_COLOR,
                                             },
-                                            Default::default(),
                                         ),
                                         ..default()
                                     })
@@ -140,9 +147,10 @@ fn difficulty_event_system(
     mut level: ResMut<Level>,
     mut scoreboard: ResMut<Scoreboard>,
     asset_server: Res<AssetServer>,
+    textures: Res<Textures>,
 ) {
     // We only care about the last event if multiple StartEvents have issued
-    if let Some(event) = reader.iter().last() {
+    if let Some(event) = reader.read().last() {
         for entity in query.iter() {
             commands.entity(entity).despawn_recursive();
         }
@@ -151,14 +159,14 @@ fn difficulty_event_system(
 
         let towers = query_towers.iter().count();
         if towers == 0 {
-            spawn_towers(&mut commands, &asset_server);
+            spawn_towers(&mut commands, &asset_server, &textures);
         }
     }
 }
 
 fn difficulty_button_system(
     mut interaction_query: Query<
-        (&Interaction, &mut UiColor, &DifficultyButton),
+        (&Interaction, &mut BackgroundColor, &DifficultyButton),
         (Changed<Interaction>, With<Button>),
     >,
     mut writer: EventWriter<StartEvent>,
@@ -168,7 +176,7 @@ fn difficulty_button_system(
     if let Level::Select = level.as_ref() {
         for (interaction, mut color, difficulty) in interaction_query.iter_mut() {
             match *interaction {
-                Interaction::Clicked => {
+                Interaction::Pressed => {
                     if scoreboard.stages[difficulty.difficulty].unlocked {
                         writer.send(StartEvent(difficulty.difficulty));
                     } else {
@@ -191,10 +199,10 @@ fn show_difficulty_buttons_system(
     level: Res<Level>,
 ) {
     for mut visibility in button_query.iter_mut() {
-        visibility.is_visible = if let Level::Select = level.as_ref() {
-            true
+        *visibility = if matches!(level.as_ref(), Level::Select) {
+            Visibility::Inherited
         } else {
-            false
+            Visibility::Hidden
         };
     }
 }
@@ -206,20 +214,24 @@ fn cleared_icon_system(
     asset_server: Res<AssetServer>,
 ) {
     for (mut visibility, mut image, cleared) in icon_query.iter_mut() {
-        visibility.is_visible = if let Level::Select = level.as_ref() {
+        *visibility = if let Level::Select = level.as_ref() {
             if let Some(score) = scoreboard.stages.get(cleared.0) {
                 if score.high_score.is_some() {
                     *image = asset_server.load("checked.png").into();
-                    true
+                    Visibility::Inherited
                 } else {
                     *image = asset_server.load("locked.png").into();
-                    !score.unlocked
+                    if score.unlocked {
+                        Visibility::Hidden
+                    } else {
+                        Visibility::Inherited
+                    }
                 }
             } else {
-                false
+                Visibility::Hidden
             }
         } else {
-            false
+            Visibility::Hidden
         };
     }
 }

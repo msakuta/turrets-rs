@@ -7,7 +7,7 @@ use crate::{
     BulletFilter, Explosion, Health, Position, Rotation, Scoreboard, StageClear, Target, Textures,
     Velocity,
 };
-use bevy::{prelude::*, sprite::collide_aabb::collide};
+use bevy::{prelude::*, sprite::collide_aabb::collide, window::PrimaryWindow};
 use bevy_prototype_lyon::prelude::*;
 
 pub(crate) const ENEMY_SIZE: f32 = 20.;
@@ -19,6 +19,7 @@ const SHOTGUN_SHOOT_INTERVAL: f32 = 0.75;
 const MISSILE_SHOOT_INTERVAL: f32 = 2.5;
 const BULLET_SPEED: f32 = 500.;
 
+#[derive(Event)]
 pub(crate) struct GainExpEvent {
     pub entity: Entity,
     pub exp: usize,
@@ -30,16 +31,13 @@ pub(crate) struct BulletPlugin;
 
 impl Plugin for BulletPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(ShapePlugin);
+        app.add_plugins(ShapePlugin);
         app.add_event::<GainExpEvent>();
-        app.add_system_set(
-            SystemSet::new()
-                .with_run_criteria(can_update)
-                .with_system(shoot_bullet)
-                .with_system(bullet_collision_system)
-                .with_system(missile_system),
+        app.add_systems(
+            Update,
+            (shoot_bullet, bullet_collision_system, missile_system).run_if(can_update),
         );
-        app.add_system(cleanup);
+        app.add_systems(Update, cleanup);
     }
 }
 
@@ -71,6 +69,7 @@ pub(crate) fn shoot_bullet(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     time: Res<Time>,
+    textures: Res<Textures>,
     mut query: Query<(
         Entity,
         &Position,
@@ -110,34 +109,33 @@ pub(crate) fn shoot_bullet(
                             ),
                     );
 
-                    let trail =
-                        missile_shooter.map(|_| missile::gen_trail(&mut commands, &position));
+                    let trail = missile_shooter
+                        .map(|_| missile::gen_trail(&mut commands, &position, &textures));
 
                     sprite_transform_single(&position, Some(&bullet_rotation), &mut transform, 0.);
                     let sprite = commands
-                        .spawn_bundle(SpriteBundle {
+                        .spawn(SpriteBundle {
                             texture: asset_server.load(file),
                             transform: Transform::from_scale(Vec3::ONE * 3.),
                             ..default()
                         })
                         .id();
 
-                    let mut builder = commands.spawn();
-                    builder.insert(Bullet {
-                        filter: !bullet_filter.filter,
-                        owner: entity,
-                        damage: bullet_shooter.damage,
-                    });
-                    builder.insert_bundle(TransformBundle {
-                        local: transform,
-                        ..default()
-                    });
-                    builder.insert(position);
-                    builder.insert(bullet_rotation);
-                    builder.insert(Velocity(
-                        speed * Vec2::new(angle.cos() as f32, angle.sin() as f32),
+                    let mut builder = commands.spawn((
+                        Bullet {
+                            filter: !bullet_filter.filter,
+                            owner: entity,
+                            damage: bullet_shooter.damage,
+                        },
+                        TransformBundle {
+                            local: transform,
+                            ..default()
+                        },
+                        position,
+                        bullet_rotation,
+                        Velocity(speed * Vec2::new(angle.cos() as f32, angle.sin() as f32)),
+                        StageClear,
                     ));
-                    builder.insert(StageClear);
                     if let Some((target, trail)) = target.zip(trail) {
                         builder.insert(Missile::new(target, trail, &position));
                     }
@@ -276,12 +274,12 @@ fn single_collision(
                 commands.entity(tower.health_bar.1).despawn();
             }
             commands
-                .spawn_bundle(SpriteSheetBundle {
+                .spawn(SpriteSheetBundle {
                     texture_atlas: textures.large_explosion.clone(),
                     transform: bullet_transform.clone().with_scale(Vec3::splat(4.0)),
                     ..default()
                 })
-                .insert(Explosion(Timer::from_seconds(0.15, true)))
+                .insert(Explosion(Timer::from_seconds(0.15, TimerMode::Repeating)))
                 .insert(StageClear)
                 .insert(TempEnt);
             scoreboard.score += bullet_filter.exp as f64;
@@ -297,12 +295,12 @@ fn single_collision(
         }
 
         commands
-            .spawn_bundle(SpriteSheetBundle {
+            .spawn(SpriteSheetBundle {
                 texture_atlas: textures.small_explosion.clone(),
                 transform: bullet_transform.clone().with_scale(Vec3::splat(3.0)),
                 ..default()
             })
-            .insert(Explosion(Timer::from_seconds(0.06, true)))
+            .insert(Explosion(Timer::from_seconds(0.06, TimerMode::Repeating)))
             .insert(StageClear)
             .insert(TempEnt);
     }
@@ -310,14 +308,16 @@ fn single_collision(
 
 fn cleanup(
     mut commands: Commands,
-    windows: Res<Windows>,
+    // windows: Res<Windows>,
+    window: Query<&Window, With<PrimaryWindow>>,
     query: Query<(Entity, &Position, Option<&Missile>), (With<Bullet>, Without<Missile>)>,
 ) {
-    let window = if let Some(window) = windows.iter().next() {
-        window
-    } else {
-        return;
-    };
+    // let window = if let Some(window) = windows.iter().next() {
+    //     window
+    // } else {
+    //     return;
+    // };
+    let window = window.single();
     let (width, height) = (window.width(), window.height());
     for (entity, position, missile) in query.iter() {
         if position.0.x < -width / 2.

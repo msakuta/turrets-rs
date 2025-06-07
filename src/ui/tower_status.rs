@@ -25,31 +25,33 @@ struct TowerExpText;
 struct TowerShooterText;
 
 pub(super) fn build_tower_status(app: &mut App) {
-    app.add_startup_system(add_status_panel);
-    app.add_system(update_tower_scoreboard);
-    app.add_system(update_tower_health);
-    app.add_system(update_tower_level);
-    app.add_system(update_tower_experience);
-    app.add_system(update_tower_damage);
+    app.add_systems(Startup, add_status_panel);
+    app.add_systems(
+        Update,
+        (
+            update_tower_scoreboard,
+            update_tower_health,
+            update_tower_level,
+            update_tower_experience,
+            update_tower_damage,
+        ),
+    );
 }
 
 fn add_status_panel(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
                 // justify_content: JustifyContent::Center,
                 align_items: AlignItems::FlexStart,
                 flex_direction: FlexDirection::ColumnReverse,
                 position_type: PositionType::Absolute,
-                position: Rect {
-                    top: Val::Px(PADDING * 2. + BUTTON_HEIGHT),
-                    right: Val::Px(PADDING * 2. + PALETTE_SIZE),
-                    ..default()
-                },
-                padding: Rect::all(Val::Px(2.)),
+                top: Val::Px(PADDING * 2. + BUTTON_HEIGHT),
+                right: Val::Px(PADDING * 2. + PALETTE_SIZE),
+                padding: UiRect::all(Val::Px(2.)),
                 ..default()
             },
-            color: Color::rgba(0., 0., 0., 0.8).into(),
+            background_color: Color::rgba(0., 0., 0., 0.8).into(),
             ..default()
         })
         .with_children(|parent| {
@@ -82,7 +84,7 @@ fn update_tower_scoreboard(
 ) {
     if let Ok(mut text) = text_query.get_single_mut() {
         if let Some(selected_tower) = selected_tower
-            .as_ref()
+            .0
             .as_ref()
             .and_then(|tower| tower_score_query.get(tower.tower).ok())
         {
@@ -100,7 +102,7 @@ fn update_tower_health(
 ) {
     if let Ok(mut text) = text_query.get_single_mut() {
         if let Some(health) = selected_tower
-            .as_ref()
+            .0
             .as_ref()
             .and_then(|tower| tower_health_query.get(tower.tower).ok())
         {
@@ -118,7 +120,7 @@ fn update_tower_level(
 ) {
     if let Ok(mut text) = text_query.get_single_mut() {
         if let Some(selected_tower) = selected_tower
-            .as_ref()
+            .0
             .as_ref()
             .and_then(|tower| tower_level_query.get(tower.tower).ok())
         {
@@ -136,7 +138,7 @@ fn update_tower_experience(
 ) {
     if let Ok(mut text) = text_query.get_single_mut() {
         if let Some(tower_level) = selected_tower
-            .as_ref()
+            .0
             .as_ref()
             .and_then(|tower| tower_level_query.get(tower.tower).ok())
         {
@@ -160,7 +162,7 @@ fn update_tower_damage(
 ) {
     if let Ok(mut text) = text_query.get_single_mut() {
         match selected_tower
-            .as_ref()
+            .0
             .as_ref()
             .and_then(|tower| tower_shooter_query.get(tower.tower).ok())
         {

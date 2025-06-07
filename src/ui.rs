@@ -22,31 +22,50 @@ pub(crate) struct UIPlugin;
 
 impl Plugin for UIPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(DifficultySelectPlugin);
+        app.add_plugins(DifficultySelectPlugin);
         app.add_event::<StartEvent>();
         app.add_event::<QuitEvent>();
         app.add_event::<PauseEvent>();
-        app.add_startup_system(build_ui);
-        app.add_system(update_progress_bar);
-        app.add_system(update_level);
-        app.add_system(update_scoreboard);
-        app.add_system(update_credits);
+        app.add_systems(Startup, build_ui);
+        app.add_systems(
+            Update,
+            (
+                update_progress_bar,
+                update_level,
+                update_scoreboard,
+                update_credits,
+            ),
+        );
         build_tower_status(app);
         build_tower_palette(app);
-        app.add_system(quit_event_system);
-        app.add_system(quit_button_system);
-        app.add_system(show_quit_button_system);
+        app.add_systems(
+            Update,
+            (
+                quit_event_system,
+                quit_button_system,
+                show_quit_button_system,
+            ),
+        );
         app.insert_resource(PauseState(false));
-        app.add_system(pause_event_system);
-        app.add_system(pause_button_system);
-        app.add_system(show_pause_button_system);
+        app.add_systems(
+            Update,
+            (
+                pause_event_system,
+                pause_button_system,
+                show_pause_button_system,
+            ),
+        );
     }
 }
 
+#[derive(Event)]
 struct StartEvent(usize);
+#[derive(Event)]
 struct QuitEvent;
+#[derive(Event)]
 struct PauseEvent;
 
+#[derive(Resource)]
 pub(crate) struct PauseState(bool);
 
 #[derive(Component)]
@@ -55,7 +74,6 @@ struct ProgressBar;
 const SCOREBOARD_FONT_SIZE: f32 = 40.0;
 const PADDING: f32 = 5.;
 const PADDING_PX: Val = Val::Px(PADDING);
-const PADDING_PX2: Val = Val::Px(PADDING * 2.);
 const TEXT_COLOR: Color = Color::rgb(0.9, 0.9, 0.9);
 const SCORE_COLOR: Color = Color::rgb(1.0, 0.5, 0.5);
 
@@ -70,29 +88,28 @@ fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     add_scoreboard(&mut commands, &asset_server);
 
     commands
-        .spawn_bundle(NodeBundle {
+        .spawn(NodeBundle {
             style: Style {
-                size: Size::new(Val::Percent(80.0), Val::Px(20.0)),
+                width: Val::Percent(80.0),
+                height: Val::Px(20.0),
                 position_type: PositionType::Absolute,
-                position: Rect {
-                    left: Val::Px(10.0),
-                    bottom: Val::Px(10.0),
-                    ..default()
-                },
-                border: Rect::all(Val::Px(2.0)),
+                left: Val::Px(10.0),
+                bottom: Val::Px(10.0),
+                border: UiRect::all(Val::Px(2.0)),
                 ..default()
             },
-            color: Color::rgb(0.4, 0.4, 1.0).into(),
+            background_color: Color::rgb(0.4, 0.4, 1.0).into(),
             ..default()
         })
         .with_children(|parent| {
             parent
-                .spawn_bundle(NodeBundle {
+                .spawn(NodeBundle {
                     style: Style {
-                        size: Size::new(Val::Percent(100.0), Val::Percent(100.0)),
+                        width: Val::Percent(100.0),
+                        height: Val::Percent(100.0),
                         ..default()
                     },
-                    color: Color::rgb(0.8, 0.8, 1.0).into(),
+                    background_color: Color::rgb(0.8, 0.8, 1.0).into(),
                     ..default()
                 })
                 .insert(ProgressBar);
@@ -110,7 +127,7 @@ fn update_progress_bar(level: Res<Level>, mut query: Query<&mut Style, With<Prog
     // println!("bar: {bar:?}");
     if let Ok(mut bar) = bar {
         if let Level::Running { timer, .. } = level.as_ref() {
-            bar.size.width = Val::Percent(timer.percent() * 100.);
+            bar.width = Val::Percent(timer.percent() * 100.);
         }
     }
 }
@@ -129,7 +146,7 @@ fn spawn_text(
     text: &[&str],
     components: impl FnOnce(EntityCommands),
 ) {
-    let builder = parent.spawn_bundle(TextBundle {
+    let builder = parent.spawn(TextBundle {
         text: Text {
             sections: text
                 .iter()

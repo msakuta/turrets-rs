@@ -1,10 +1,9 @@
-use bevy::{ecs::schedule::ShouldRun, prelude::*};
+use bevy::prelude::*;
 
 use crate::Level;
 
 use super::{
-    PauseEvent, PauseState, BUTTON_HEIGHT, PADDING_PX, PADDING_PX2, SCOREBOARD_FONT_SIZE,
-    TEXT_COLOR,
+    PauseEvent, PauseState, BUTTON_HEIGHT, PADDING, PADDING_PX, SCOREBOARD_FONT_SIZE, TEXT_COLOR,
 };
 
 const NORMAL_BUTTON: Color = Color::rgb(0.15, 0.15, 0.15);
@@ -17,35 +16,32 @@ pub(super) struct PauseButtonFilter;
 
 pub(super) fn add_pause_button(commands: &mut Commands, asset_server: &Res<AssetServer>) {
     commands
-        .spawn_bundle(ButtonBundle {
+        .spawn(ButtonBundle {
             style: Style {
-                size: Size::new(Val::Px(100.0), Val::Px(BUTTON_HEIGHT)),
-                margin: Rect::all(Val::Auto),
+                width: Val::Px(100.0),
+                height: Val::Px(BUTTON_HEIGHT),
+                margin: UiRect::all(Val::Auto),
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 position_type: PositionType::Absolute,
-                position: Rect {
-                    top: PADDING_PX,
-                    right: PADDING_PX2 + super::quit::BUTTON_WIDTH,
-                    ..default()
-                },
+                top: PADDING_PX,
+                right: Val::Px(PADDING + super::quit::BUTTON_WIDTH),
                 ..default()
             },
-            color: NORMAL_BUTTON.into(),
+            background_color: NORMAL_BUTTON.into(),
             ..default()
         })
         .insert(PauseButtonFilter)
         .with_children(|parent| {
             parent
-                .spawn_bundle(TextBundle {
-                    text: Text::with_section(
+                .spawn(TextBundle {
+                    text: Text::from_section(
                         "Pause",
                         TextStyle {
                             font: asset_server.load("fonts/FiraSans-Bold.ttf"),
                             font_size: SCOREBOARD_FONT_SIZE,
                             color: TEXT_COLOR,
                         },
-                        Default::default(),
                     ),
                     ..default()
                 })
@@ -55,7 +51,7 @@ pub(super) fn add_pause_button(commands: &mut Commands, asset_server: &Res<Asset
 
 pub(super) fn pause_button_system(
     mut interaction_query: Query<
-        (&Interaction, &mut UiColor),
+        (&Interaction, &mut BackgroundColor),
         (Changed<Interaction>, With<Button>, With<PauseButtonFilter>),
     >,
     mut writer: EventWriter<PauseEvent>,
@@ -67,7 +63,7 @@ pub(super) fn pause_button_system(
     }
     for (interaction, mut color) in interaction_query.iter_mut() {
         match *interaction {
-            Interaction::Clicked => {
+            Interaction::Pressed => {
                 writer.send(PauseEvent);
             }
             Interaction::Hovered => {
@@ -92,18 +88,14 @@ pub(super) fn pause_event_system(
     mut reader: EventReader<PauseEvent>,
     mut pause_state: ResMut<PauseState>,
 ) {
-    if reader.iter().last().is_some() {
+    if reader.read().last().is_some() {
         println!("Received PauseEvent: {}", pause_state.0);
         pause_state.0 = !pause_state.0;
     }
 }
 
-pub(crate) fn not_paused(pause_state: Res<PauseState>) -> ShouldRun {
-    if pause_state.0 {
-        ShouldRun::No
-    } else {
-        ShouldRun::Yes
-    }
+pub(crate) fn not_paused(pause_state: Res<PauseState>) -> bool {
+    !pause_state.0
 }
 
 pub(super) fn show_pause_button_system(
@@ -111,10 +103,10 @@ pub(super) fn show_pause_button_system(
     level: Res<Level>,
 ) {
     for mut button in button_query.iter_mut() {
-        button.is_visible = if let Level::Select = level.as_ref() {
-            false
+        *button = if let Level::Select = level.as_ref() {
+            Visibility::Hidden
         } else {
-            true
+            Visibility::Inherited
         };
     }
 }
